@@ -24,7 +24,6 @@ export default class LevelDirector {
 
   start() {
     this.brain.plan({ allowTrojan: false }); // the first plan: nothing known yet
-    this.scene.hud('setBrain', this.brain.getState());
     this.next();
   }
 
@@ -82,13 +81,12 @@ export default class LevelDirector {
         this.scene.lookAtJadugar(true);
         this.scene.jadugar.think(REPLAN_THINK * 1000);
         this.scene.sayOnce('replan' + this.index, 'mithu.replan');
-        this.scene.hud('setBrainThinking', true);
+        this.scene.hud('setJadugarThinking', true);
       }
     } else if (this.phase === 'think') {
       if (this.timer >= REPLAN_THINK) {
         this.brain.plan({ allowTrojan: this.step.allowTrojan });
-        this.scene.hud('setBrainThinking', false);
-        this.scene.hud('setBrain', this.brain.getState());
+        this.scene.hud('setJadugarThinking', false);
         this.phase = 'pause';
         this.timer = 0;
       }

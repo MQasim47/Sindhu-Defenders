@@ -15,6 +15,7 @@ import { buildCourtyardArt } from '../level/CourtyardArt.js';
 import { buildFallbackCourtyard } from '../level/fallbackCourtyard.js';
 import { LEVELS, FIRST_LEVEL } from '../data/levels.js';
 import { saveResult } from '../data/progress.js';
+import { saveSnapshot } from '../ai/chatContext.js';
 import { settings } from '../data/settings.js';
 import { CSS, FONT } from '../data/colors.js';
 import { addText } from '../i18n/i18nText.js';
@@ -91,14 +92,11 @@ export default class LevelScene extends Phaser.Scene {
     // the intro starts with the camera on the Jadugar (it then moves to Dodo)
     this.time.delayedCall(700, () => this.director.start());
 
-    this.input.keyboard.once('keydown-ESC', () => {
-      this.cameras.main.fadeOut(400, 11, 13, 26);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.stop('UI');
-        this.scene.start('Menu');
-      });
+    // (Esc opens the pause menu, which lives in the UI scene)
+    this.events.once('shutdown', () => {
+      EVENTS.forEach((name) => this.events.off(name));
+      saveSnapshot(this.game, this); // so "Ask Mithu" on the title screen knows the last game
     });
-    this.events.once('shutdown', () => EVENTS.forEach((name) => this.events.off(name)));
   }
 
   buildJadugar() {
@@ -189,7 +187,6 @@ export default class LevelScene extends Phaser.Scene {
     ev.on('stolen', (m) => {
       this.stats.sneaked++;
       this.brain.recordFail('phishing', m.kind);
-      this.hud('setBrain', this.brain.getState());
       this.hud('setSneaked', this.stats.sneaked);
       this.hud('stealCoins', lv.stealAmount, () => this.toScreen(m.x, m.y - 50));
       this.sayOnce('firstSteal', 'mithu.firstSteal');
@@ -215,7 +212,6 @@ export default class LevelScene extends Phaser.Scene {
     ev.on('gift-opened', () => {
       this.stats.giftsOpened++;
       this.brain.recordFail('trojan');
-      this.hud('setBrain', this.brain.getState());
       this.sayOnce('giftOpened', 'mithu.giftOpened');
       this.jadugarReacts(true);
     });
@@ -240,6 +236,7 @@ export default class LevelScene extends Phaser.Scene {
   jadugarReacts(playerFailed) {
     if (this.jadugarCooldown > 0) return;
     this.jadugarCooldown = 4;
+    this.hud('setJadugarMood', playerFailed ? 'laugh' : 'angry');
     if (playerFailed) this.jadugar.laugh();
     else this.jadugar.beaten();
   }
@@ -256,6 +253,7 @@ export default class LevelScene extends Phaser.Scene {
   finishLevel() {
     const stars = this.computeStars();
     const tally = saveResult(this.levelData.id, stars);
+    saveSnapshot(this.game, this);
     this.hud('showResults', {
       stars,
       caught: this.stats.caught + this.stats.giftsRevealed,

@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import Button from '../ui/Button.js';
 import { COLORS, CSS, FONT } from '../data/colors.js';
 import { addText, setSource } from '../i18n/i18nText.js';
-import BrainPanel from '../ui/BrainPanel.js';
+import JadugarPortrait from '../ui/JadugarPortrait.js';
+import PauseMenu from '../ui/PauseMenu.js';
 import { openResults } from '../ui/ResultsCard.js';
 import { t } from '../i18n/index.js';
 import { playSfx } from '../fx/sound.js';
@@ -37,8 +38,10 @@ export default class UIScene extends Phaser.Scene {
     this.buildCounters();
     this.buildTimer();
     this.buildFlights();
-    this.brainPanel = new BrainPanel(this);
-    this.tabKey = this.input.keyboard.addKey('TAB');
+    this.portrait = new JadugarPortrait(this, 1198, 84);
+    this.escKey = this.input.keyboard.addKey('ESC');
+    this.pauseMenu = new PauseMenu(this, this.levelScene, () => this.toMenu());
+    this.resultsOpen = false;
     this.ready = true;
   }
 
@@ -180,13 +183,13 @@ export default class UIScene extends Phaser.Scene {
     this.lastBar = -1;
   }
 
-  // the AI Hacker's brain panel
-  setBrain(state) {
-    this.brainPanel.setBrain(state);
+  // the small Jadugar picture in the corner
+  setJadugarMood(mood) {
+    this.portrait.setMood(mood);
   }
 
-  setBrainThinking(on) {
-    this.brainPanel.setBrainThinking(on);
+  setJadugarThinking(on) {
+    this.portrait.setThinking(on);
   }
 
   setCaught(n) {
@@ -260,10 +263,7 @@ export default class UIScene extends Phaser.Scene {
 
   update(time, delta) {
     const dt = delta / 1000;
-    if (this.ready) {
-      this.brainPanel.update(dt);
-      if (Phaser.Input.Keyboard.JustDown(this.tabKey)) this.brainPanel.toggle();
-    }
+    if (this.ready && !this.resultsOpen && Phaser.Input.Keyboard.JustDown(this.escKey)) this.pauseMenu.toggle();
     for (const f of this.flights) {
       if (!f.active) continue;
       f.t += dt;
@@ -295,6 +295,7 @@ export default class UIScene extends Phaser.Scene {
 
   // data: see ResultsCard.js (the Level fills in everything except the two buttons)
   showResults(data) {
+    this.resultsOpen = true;
     this.resultObjects = openResults(this, { ...data, onRetry: () => this.again(), onMenu: () => this.toMenu() });
   }
 

@@ -281,17 +281,17 @@ export function createGameTextures(scene) {
     ctx.stroke();
   });
 
-  // The light cone. Apex at the left middle, 420 long.
-  makeCanvasTexture(scene, 'fx-cone', 420, 450, (ctx) => {
-    const c = newCanvas(420, 450);
+  // The light cone. Apex at the left middle, 420 long, 74 degrees wide (half angle 0.65 rad).
+  makeCanvasTexture(scene, 'fx-cone', 420, 660, (ctx) => {
+    const c = newCanvas(420, 660);
     const k = c.getContext('2d');
-    const half = Math.tan(0.5) * 420;
+    const half = Math.tan(0.65) * 420;
     k.beginPath();
-    k.moveTo(0, 225);
-    k.lineTo(420, 225 - half);
-    k.lineTo(420, 225 + half);
+    k.moveTo(0, 330);
+    k.lineTo(420, 330 - half);
+    k.lineTo(420, 330 + half);
     k.closePath();
-    const g = k.createRadialGradient(0, 225, 10, 0, 225, 420);
+    const g = k.createRadialGradient(0, 330, 10, 0, 330, 440);
     g.addColorStop(0, 'rgba(255,236,170,0.85)');
     g.addColorStop(0.5, 'rgba(255,205,110,0.4)');
     g.addColorStop(1, 'rgba(255,190,90,0)');

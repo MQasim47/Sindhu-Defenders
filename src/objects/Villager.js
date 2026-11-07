@@ -159,7 +159,7 @@ export default class Villager extends Phaser.GameObjects.Container {
   // the light moved away: the progress drains slowly
   cool(dt) {
     if (this.lit <= 0) return;
-    this.lit = Math.max(0, this.lit - dt * 1.5);
+    this.lit = Math.max(0, this.lit - dt * 0.6);
     if (this.lit === 0) {
       this.squint.setVisible(false);
       this.headImage.setScale(1, 1);

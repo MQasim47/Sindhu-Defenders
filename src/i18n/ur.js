@@ -25,6 +25,7 @@ export default {
     howTo: 'کیسے کھیلیں',
     settings: 'ترتیبات',
     clickToStart: 'شروع کرنے کے لیے کلک کریں',
+    askMithu: 'Mithu سے پوچھو',
   },
   howto: {
     title: 'کیسے کھیلیں',
@@ -116,14 +117,6 @@ export default {
     thinking: 'سوچ رہا ہے...',
   },
   brain: {
-    title: 'AI کا دماغ',
-    subtitle: 'جادوگر اگلا کیا بھیجے گا',
-    disguises: 'بھیس',
-    attacks: 'حملے',
-    exploit: 'کمزوری پر وار',
-    explore: 'نیا تجربہ',
-    thinking: 'سوچ رہا ہے...',
-    tab: 'Tab: دکھائیں / چھپائیں',
     names: {
       chacha: 'چاچا',
       amma: 'اماں',
@@ -138,5 +131,11 @@ export default {
       gifts: 'Dodo نے {n} مفت تحفے کھول دیے → اور تحفے آ رہے ہیں۔',
       noted: 'نوٹ کیا: {name} نے Dodo کو دھوکا دیا!',
     },
+  },
+  pause: {
+    title: 'وقفہ',
+    resume: 'جاری رکھو',
+    askMithu: 'Mithu سے پوچھو',
+    quit: 'مینو پر واپس',
   },
 };

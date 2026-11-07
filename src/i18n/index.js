@@ -118,3 +118,11 @@ export function prepare(text, base) {
   });
   return lines.map((line) => RLE + line).join('\n');
 }
+
+// Text in English only (used by the chatbot, which always speaks English)
+export function tEn(key, vars) {
+  let text = lookup(en, key);
+  if (typeof text !== 'string') return key;
+  if (vars) text = text.replace(/\{(\w+)\}/g, (m, name) => (vars[name] !== undefined ? vars[name] : m));
+  return text;
+}

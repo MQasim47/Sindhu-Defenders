@@ -360,7 +360,8 @@ export default class Player extends Phaser.GameObjects.Container {
     this.time += dt;
     const k = this.keys;
 
-    const free = !this.inputLocked;
+    // while the lantern is up, the arrow keys turn the beam (see Lantern.js), so Dodo stands still
+    const free = !this.inputLocked && !this.lanternUp;
     let inputX = free ? (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0) : 0;
     let inputY = free ? (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0) : 0;
     const pressing = inputX !== 0 || inputY !== 0;
@@ -370,7 +371,6 @@ export default class Player extends Phaser.GameObjects.Container {
     }
 
     if (this.slowTimer > 0) this.slowTimer -= dt;
-    if (pressing && this.lanternUp) this.aim = Math.atan2(inputY, inputX);
     this.updateJumpState(dt);
 
     // Move the speed towards the wanted speed (smooth, not instant).

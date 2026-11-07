@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import Button from '../ui/Button.js';
 import { createLogoTitle, createRibbon } from '../ui/LogoText.js';
 import { openPanel } from '../ui/Panel.js';
+import { openChat } from '../ui/chat/ChatPanel.js';
 import { t } from '../i18n/index.js';
 import Player from '../objects/Player.js';
 import { makeCanvasTexture } from '../fx/canvasUtil.js';
@@ -242,6 +243,7 @@ export default class MenuScene extends Phaser.Scene {
     const defs = [
       { label: 'menu.play', y: 350, opts: { width: 380, height: 108, fontSize: 54, pulse: true }, action: () => this.startGame() },
       { label: 'menu.howTo', y: 472, opts: { width: 320, height: 74, fontSize: 30, style: 'indigo' }, action: () => this.showHowTo() },
+      { label: 'menu.askMithu', y: 646, opts: { width: 320, height: 66, fontSize: 28, style: 'indigo' }, action: () => this.askMithu() },
       { label: 'menu.settings', y: 560, opts: { width: 320, height: 74, fontSize: 30, style: 'indigo' }, action: () => this.showSettings() },
     ];
     this.buttons = defs.map((d, i) => {
@@ -269,6 +271,11 @@ export default class MenuScene extends Phaser.Scene {
       pulse.stop();
       this.tweens.add({ targets: text, alpha: 0, duration: 300, onComplete: () => text.destroy() });
     });
+  }
+
+  // the chat with Mithu (the last game, if there was one, gives him real numbers to talk about)
+  askMithu() {
+    openChat(this, { getSnapshot: () => this.registry.get('lastGame') || null });
   }
 
   showHowTo() {

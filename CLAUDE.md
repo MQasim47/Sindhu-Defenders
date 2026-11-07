@@ -8,7 +8,7 @@ Ranikot Fort (Jamshoro, Sindh) is called the "Great Wall of Sindh" — its wall 
 ## Characters (original designs — never copy existing cartoon characters)
 - **Dodo** (boy hero) / **Marvi** (girl hero, selectable) — chibi style, big round head, big expressive eyes, colourful **Sindhi topi**, red-and-indigo **Ajrak cape** that flows when running. Names come from Sindhi folk heroes.
 - **Mithu** — a cute green parrot (tota), the player's AI guide. Flies beside the hero, gives hints in short, simple lines ("Wait, Dodo! This link is fake!"). Not a robot.
-- **Villain: Jadugar Hacker** — the AI. Sits on a hill outside the fort with a glowing crystal ball, watches the player, and sends monsters. The crystal ball is the "AI ka Dimagh" panel.
+- **Villain: Jadugar Hacker** — the AI. Sits on a hill outside the fort with a glowing crystal ball, watches the player, and sends monsters. The crystal ball glows in the Jadugar portrait of the HUD while he plans.
 - **Monsters** — round, squishy, funny-scary cartoon blobs. No robots.
 
 ## Core rule: cyber security is a game MECHANIC, never a reading quiz
@@ -28,7 +28,15 @@ No screens of links or messages to read under time pressure. Every attack is a m
 3. **Natija (result):** stars, coins, and what the AI learned about you.
 
 ## Controls (simple enough for a class-7 student)
-Arrow keys / WASD to move · **Space** = jump · hold **Q** = Sach ki Lalten (scan) · **E** = greet a friend / sweep bugs with the Antivirus Jharoo (later: pick up / place) · On-screen buttons for touch.
+Arrow keys / WASD to move · **Space** = jump · hold **Q** = Sach ki Lalten (Dodo stands still and the arrow keys / WASD turn the light beam; soft aim help bends it a little towards a person) · **E** = greet a friend / sweep bugs with the Antivirus Jharoo · **Esc** = pause menu (Resume, Ask Mithu, Quit) · On-screen buttons for touch.
+
+## Ask Mithu (local AI chatbot, English only)
+- Opened from the title screen ("Ask Mithu") or the pause menu (Esc). Opening it pauses the game; closing resumes. It is a normal HTML panel (`src/ui/chat/`) so typing, Enter and Esc work like a web page. History is kept in memory only (max 20 messages, "Clear" button).
+- **Engine A (main): Ollama** running on the same computer. One-time setup: install Ollama, then `ollama pull qwen2.5:1.5b`. The model name is `OLLAMA_MODEL` in `src/data/chatConfig.js`. The browser calls `/ollama/...`; `vite.config.js` proxies it to `http://localhost:11434` for BOTH `npm run dev` and `npm run preview`. The reply is streamed into the bubble.
+- The system prompt (`src/ai/chatEngine.js`) = Mithu's rules (only this game, cyber safety and AI basics; simple English; max 3 short sentences; never invent facts) + `KNOWLEDGE_TEXT` from `src/data/projectKnowledge.js` + the LIVE game data: `HackerBrain.getState()` (weakness scores, log, counts) and the current score (`src/ai/chatContext.js`). So "What has the AI learned about me?" uses real numbers.
+- **Engine B (fallback, always works offline): `src/ai/faqBot.js`** - about 35 question/answer pairs from `projectKnowledge.js`, matched with TF-IDF + cosine similarity. "What has the AI learned about me" is built from `getState()`. If nothing matches well, Mithu says what he can talk about and the 4 suggestion chips stay visible. The player never sees a raw error.
+- Used automatically if Ollama does not answer a quick check within 2 seconds, or if it errors. The status dot in the chat header is green "AI model" (Ollama) or amber "Offline mode" (FAQ).
+- If Ollama is not running, the proxy answers with a harmless JSON message (no 404/500 in the browser console).
 
 ## Levels (scope for 5 days)
 1. Sann Gate — Behroopia Qasid (phishing) + Trojan Ghoda
@@ -38,7 +46,7 @@ Shah-Pere and Mohan gates shown as "Coming soon" on the map. Two perfect levels 
 
 ## AI systems (must be real, visible and explainable to a 13-year-old)
 1. **Adaptive AI Hacker (Jadugar)** — tracks, per attack type and per variant, how often the player fails (`(fails+1)/(faced+2)`). It adapts three things: which monster types to send, which disguises the phishers use (e.g. if the player never scans "old lady" villagers, more phishers disguise as old ladies), and which wall side the brutes attack (the weakest one). Exploit ~85%, explore ~15%. Keep the logic in one small readable module: `src/ai/HackerBrain.js`.
-2. **"AI ka Dimagh" panel** — live on-screen panel showing the hacker's current probabilities as animated bars and a short log ("Dodo fake links par 3 dafa phansa → zyada phishing bhej raha hoon").
+2. **Jadugar portrait** (top-right of the HUD, round frame with an Ajrak border): the live "AI ka Dimagh" panel was removed. The portrait smirks when idle, laughs when something gets in, looks angry when Dodo catches one, and its crystal ball glows while the AI re-plans. HackerBrain is unchanged: it still drives the waves and the results report.
 3. **Password AI** — zxcvbn estimates crack time ("3 second" vs "400 saal").
 4. **End report** — "AI Hacker ki report": biggest weakness + one tip, plus a running "Insaan vs AI Hacker" tally.
 
@@ -51,10 +59,10 @@ Shah-Pere and Mohan gates shown as "Coming soon" on the map. Two perfect levels 
     main.js            game config
     scenes/            one file per scene
     objects/           Player, Mithu, monsters (one class each)
-    ai/                HackerBrain.js, passwordAI.js
+    ai/                HackerBrain.js, chatEngine.js, faqBot.js, chatContext.js, passwordAI.js
     data/              levels.js, settings.js, assetList.js
     i18n/              en.js, ur.js, index.js (all game text, English + Urdu)
-    ui/                reusable buttons, panels, dialogue box
+    ui/                reusable buttons, panels, dialogue box, chat/ (Ask Mithu)
   public/assets/
     characters/  monsters/  ui/  fx/  audio/  fonts/  backgrounds/
   ```

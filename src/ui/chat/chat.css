@@ -1,0 +1,193 @@
+/* "Ask Mithu" chat panel. Plain HTML on top of the game (so typing works well). */
+#mithu-chat {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 13, 26, 0.66);
+  font-family: Fredoka, 'Arial Rounded MT Bold', 'Trebuchet MS', Verdana, sans-serif;
+  color: #3a1c16;
+}
+#mithu-chat.open {
+  display: flex;
+  animation: mc-fade 0.18s ease-out;
+}
+@keyframes mc-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.mc-card {
+  width: min(760px, 95vw);
+  height: min(680px, 94vh);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  border: 16px solid transparent;
+  border-radius: 28px;
+  /* the border shows the Ajrak pattern, the inside is cream */
+  background: linear-gradient(#f6ecd4, #f6ecd4) padding-box, var(--ajrak-tile, #8e1b2b) border-box;
+  background-size: auto, 96px 96px;
+  box-shadow: 0 0 0 4px #3a1c16, 0 18px 50px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  animation: mc-pop 0.28s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes mc-pop {
+  from { transform: scale(0.86); }
+  to { transform: scale(1); }
+}
+
+.mc-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #1c2457;
+  color: #f3e9d2;
+  border-bottom: 5px solid #8e1b2b;
+}
+.mc-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff6dc;
+  border: 3px solid #e8b84a;
+  flex: none;
+}
+.mc-title {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+}
+.mc-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 5px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #c9d0f5;
+}
+.mc-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #8a8a98;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+.mc-dot.online { background: #3ddc84; box-shadow: 0 0 8px #3ddc84; }
+.mc-dot.offline { background: #ffb020; box-shadow: 0 0 8px #ffb020; }
+.mc-spacer { flex: 1; }
+
+.mc-btn {
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border: 3px solid #3a1c16;
+  border-radius: 14px;
+  padding: 6px 14px;
+  background: #f3e9d2;
+  color: #3a1c16;
+  transition: transform 0.1s;
+}
+.mc-btn:hover { transform: scale(1.06); }
+.mc-btn:active { transform: scale(0.94); }
+.mc-btn.mc-close { width: 42px; padding: 4px 0; font-size: 20px; background: #d5413a; color: #fff; }
+
+.mc-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mc-row { display: flex; align-items: flex-end; gap: 8px; }
+.mc-row.user { justify-content: flex-end; }
+.mc-mini {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff6dc;
+  border: 2px solid #3a1c16;
+  flex: none;
+}
+.mc-bubble {
+  max-width: 78%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 19px;
+  line-height: 1.3;
+  border: 3px solid #3a1c16;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mc-row.mithu .mc-bubble { background: #fffaf0; border-bottom-left-radius: 4px; }
+.mc-row.user .mc-bubble { background: #34419a; color: #fff; border-bottom-right-radius: 4px; }
+
+.mc-typing { display: flex; gap: 5px; padding: 6px 4px; }
+.mc-typing i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3a1c16;
+  animation: mc-bounce 1s infinite;
+}
+.mc-typing i:nth-child(2) { animation-delay: 0.15s; }
+.mc-typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes mc-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+.mc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 14px 4px;
+}
+.mc-chip {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 2px solid #8e1b2b;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: #fff;
+  color: #8e1b2b;
+  transition: transform 0.1s, background 0.1s;
+}
+.mc-chip:hover { transform: scale(1.05); background: #ffe9ec; }
+
+.mc-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px 14px;
+}
+.mc-input {
+  flex: 1;
+  font: inherit;
+  font-size: 19px;
+  padding: 10px 14px;
+  border: 3px solid #3a1c16;
+  border-radius: 16px;
+  background: #fff;
+  color: #3a1c16;
+  outline: none;
+}
+.mc-input:focus { border-color: #34419a; box-shadow: 0 0 0 3px rgba(52, 65, 154, 0.25); }
+.mc-send {
+  font: inherit;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 3px solid #3a1c16;
+  border-radius: 16px;
+  padding: 0 20px;
+  background: #b0283c;
+  color: #fff;
+}
+.mc-send:disabled { background: #9a929e; cursor: default; }

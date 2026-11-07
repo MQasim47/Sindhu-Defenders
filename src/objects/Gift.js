@@ -90,7 +90,7 @@ export default class Gift extends Phaser.GameObjects.Container {
   }
 
   cool(dt) {
-    if (this.lit > 0) this.lit = Math.max(0, this.lit - dt * 1.5);
+    if (this.lit > 0) this.lit = Math.max(0, this.lit - dt * 0.6);
   }
 
   // The wrapping turns see-through: bugs inside! Then it pops harmlessly.

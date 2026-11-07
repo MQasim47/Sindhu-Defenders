@@ -25,6 +25,7 @@ export default {
     howTo: 'How to Play',
     settings: 'Settings',
     clickToStart: 'Click to start',
+    askMithu: 'Ask Mithu',
   },
   howto: {
     title: 'How to Play',
@@ -116,14 +117,6 @@ export default {
     thinking: 'Thinking...',
   },
   brain: {
-    title: 'AI ka Dimagh',
-    subtitle: 'What the Jadugar will send next',
-    disguises: 'Disguises',
-    attacks: 'Attacks',
-    exploit: 'Exploit',
-    explore: 'Explore',
-    thinking: 'Thinking...',
-    tab: 'Tab: show / hide',
     names: {
       chacha: 'Chacha',
       amma: 'Amma',
@@ -138,5 +131,27 @@ export default {
       gifts: 'Dodo opened {n} FREE gifts → more gifts are coming.',
       noted: 'Noted: {name} fooled Dodo!',
     },
+  },
+  pause: {
+    title: 'Paused',
+    resume: 'Resume',
+    askMithu: 'Ask Mithu',
+    quit: 'Quit to menu',
+  },
+  // The chat with Mithu is in English only (the Urdu file has no "chat" part on purpose).
+  chat: {
+    title: 'Ask Mithu',
+    clear: 'Clear',
+    send: 'Send',
+    placeholder: 'Type your question...',
+    online: 'AI model',
+    offline: 'Offline mode',
+    checking: 'Checking...',
+    hello: 'Hi! I am Mithu. Ask me about the game, cyber safety or our AI.',
+    sorry: 'Hmm, I could not think of an answer. Please ask me about the game, cyber safety or our AI.',
+    chip1: 'What is this game about?',
+    chip2: 'Where is the AI?',
+    chip3: 'What is phishing?',
+    chip4: 'What has the AI learned about me?',
   },
 };
