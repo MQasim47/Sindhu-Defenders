@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Sindhu Defenders</title>
+    <style>
+      @font-face {
+        font-family: 'Fredoka';
+        font-weight: 400;
+        src: url('/assets/fonts/Fredoka-Regular.ttf') format('truetype');
+        font-display: block;
+      }
+      @font-face {
+        font-family: 'Fredoka';
+        font-weight: 500;
+        src: url('/assets/fonts/Fredoka-Medium.ttf') format('truetype');
+        font-display: block;
+      }
+      @font-face {
+        font-family: 'Fredoka';
+        font-weight: 600;
+        src: url('/assets/fonts/Fredoka-SemiBold.ttf') format('truetype');
+        font-display: block;
+      }
+      @font-face {
+        font-family: 'Fredoka';
+        font-weight: 700;
+        src: url('/assets/fonts/Fredoka-Bold.ttf') format('truetype');
+        font-display: block;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #0b0d1a;
+        /* Outside the 1280x720 game: a dim, slowly moving Ajrak pattern (set in main.js) */
+        background-image: linear-gradient(rgba(11, 13, 26, 0.8), rgba(11, 13, 26, 0.8)), var(--ajrak-tile, none);
+        background-size: auto, 128px 128px;
+        animation: ajrak-scroll 40s linear infinite;
+      }
+      @keyframes ajrak-scroll {
+        from { background-position: 0 0, 0 0; }
+        to { background-position: 0 0, 128px 128px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html, body { animation: none; }
+      }
+      #game-container {
+        width: 100vw;
+        height: 100vh;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
