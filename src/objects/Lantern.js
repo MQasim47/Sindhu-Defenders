@@ -44,7 +44,7 @@ export default class Lantern {
 
   update(dt, npcs) {
     const p = this.player;
-    const held = p.keys.lantern.isDown && p.state !== 'crouch';
+    const held = p.keys.lantern.isDown && p.state !== 'crouch' && !p.inputLocked;
     if (held && !this.on) this.turnOn();
     if (!held && this.on) this.on = false;
     p.lanternUp = this.on;

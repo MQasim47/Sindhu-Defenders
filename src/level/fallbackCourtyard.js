@@ -27,6 +27,7 @@ export function buildFallbackCourtyard(scene) {
     start: { x: W / 2, y: H / 2 + 120 },
     gate: { x: W / 2, y: WALL_TOP + 40 },
     center: { x: W / 2, y: H / 2 + 60 },
+    jadugar: { x: W / 2 + 420, y: WALL_TOP - 30 },
     bounds: {
       minY: WALL_TOP + 40,
       maxY: H - BOTTOM - 10,

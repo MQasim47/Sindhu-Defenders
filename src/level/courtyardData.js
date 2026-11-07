@@ -101,6 +101,9 @@ export const TORCHES = [
   [1220, 192],
 ];
 export const BANNERS = [
-  [1350, 40],
-  [1430, 40],
+  [1318, 40],
+  [1478, 40],
 ];
+
+// The Jadugar stands on a stone ledge of the back wall (his feet are here).
+export const JADUGAR_SPOT = { x: 1398, y: 190 };

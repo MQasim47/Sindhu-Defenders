@@ -58,6 +58,7 @@ export default class GroundFx {
     this.rings = new SpritePool(scene, 'fx-ring', 4);
     this.prints = new SpritePool(scene, 'fx-print', settings.low ? 0 : 22);
     this.hearts = new SpritePool(scene, 'fx-heart', 8);
+    this.sparkles = new SpritePool(scene, 'fx-glint', 16);
   }
 
   puff(x, y, dirX) {
@@ -108,7 +109,25 @@ export default class GroundFx {
     this.hearts.spawn(x + (Math.random() - 0.5) * 24, y, { life: 1.1, scale0: 0.4, scale1: 1, alpha0: 1, hold: 0.5, vy: -55, depth: 90000 });
   }
 
+  // golden sparkles (a bug was swept away)
+  sparkle(x, y) {
+    for (let i = 0; i < 3; i++) {
+      this.sparkles.spawn(x + (Math.random() - 0.5) * 26, y + (Math.random() - 0.5) * 14, {
+        life: 0.55,
+        scale0: 0.4,
+        scale1: 1.5,
+        alpha0: 1,
+        hold: 0.3,
+        vy: -30,
+        angle: Math.random() * 90,
+        tint: 0xffc830,
+        depth: 90000,
+      });
+    }
+  }
+
   update(dt) {
+    this.sparkles.update(dt);
     this.hearts.update(dt);
     this.puffs.update(dt);
     this.rings.update(dt);

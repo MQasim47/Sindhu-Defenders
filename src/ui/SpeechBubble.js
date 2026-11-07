@@ -115,6 +115,6 @@ export default class SpeechBubble extends Phaser.GameObjects.Container {
   follow(sx, sy) {
     const half = WIDTH / 2 + 10;
     const x = Phaser.Math.Clamp(sx, half, 1280 - half);
-    this.setPosition(x, Phaser.Math.Clamp(sy, 262, 700));
+    this.setPosition(x, Phaser.Math.Clamp(sy, 292, 700));
   }
 }

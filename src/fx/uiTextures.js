@@ -63,6 +63,101 @@ export function createGameTextures(scene) {
     celShape(ctx, () => starPath(ctx, 34, 35, 30, 14), { base: '#7C7480', shade: '#5A5460', shadeShift: 3, ink: '#2E2832', lineWidth: 3.4 });
   });
 
+  // Round cream sleeve for the lantern arm (wide at the shoulder, narrower at the wrist, embroidered cuff).
+  // Origin: the shoulder (top).
+  makeCanvasTexture(scene, 'dodo-sleeve', 30, 60, (ctx) => {
+    const sleeve = () => {
+      ctx.beginPath();
+      ctx.moveTo(4, 8);
+      ctx.quadraticCurveTo(15, -4, 26, 8);
+      ctx.quadraticCurveTo(26, 36, 22, 54);
+      ctx.quadraticCurveTo(15, 58, 8, 54);
+      ctx.quadraticCurveTo(4, 36, 4, 8);
+      ctx.closePath();
+    };
+    celShape(ctx, sleeve, { base: '#F8EDCB', shade: '#D9C7A0', light: '#FFFBEA', lightShape: ellipse(ctx, 10, 22, 2.6, 14), shadeShift: 3, lineWidth: 2.6 });
+    ctx.strokeStyle = 'rgba(160,130,90,0.5)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(14, 12);
+    ctx.quadraticCurveTo(18, 30, 15, 46);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(7, 50);
+    ctx.quadraticCurveTo(15, 55, 23, 50);
+    ctx.lineWidth = 4.4;
+    ctx.strokeStyle = '#D5413A';
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#F5C518';
+    ctx.setLineDash([2, 2]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Small mitten-style hand that grips the lantern ring. Origin: the wrist (top centre).
+  makeCanvasTexture(scene, 'dodo-mitten', 24, 24, (ctx) => {
+    celShape(ctx, ellipse(ctx, 12, 13, 8.4, 8.6), { base: '#F5BE92', shade: '#DE9568', light: '#FFE3CA', lightShape: ellipse(ctx, 9, 9, 3, 2), shadeShift: 2, lineWidth: 2.4 });
+    // thumb wrapped round the ring
+    celShape(ctx, () => {
+      ctx.beginPath();
+      ctx.ellipse(18.6, 11, 3.6, 5.4, 0.35, 0, Math.PI * 2);
+    }, { base: '#F5BE92', shade: '#DE9568', shadeShift: 1.5, lineWidth: 2 });
+    ctx.strokeStyle = 'rgba(160,90,60,0.6)';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(7, 17);
+    ctx.lineTo(10, 21);
+    ctx.moveTo(12, 18);
+    ctx.lineTo(14, 22);
+    ctx.stroke();
+  });
+
+  // Small crystal ball for the "AI ka Dimagh" panel
+  makeCanvasTexture(scene, 'icon-brain', 56, 60, (ctx) => {
+    celShape(ctx, () => {
+      ctx.beginPath();
+      ctx.moveTo(12, 52);
+      ctx.lineTo(44, 52);
+      ctx.lineTo(38, 44);
+      ctx.lineTo(18, 44);
+      ctx.closePath();
+    }, { base: '#8A6A3A', shade: '#5E4624', shadeShift: 1.5, lineWidth: 2.4 });
+    const ball = ctx.createRadialGradient(22, 18, 3, 28, 26, 24);
+    ball.addColorStop(0, '#F0FDFF');
+    ball.addColorStop(0.4, '#8FE0FF');
+    ball.addColorStop(1, '#6A3FC0');
+    ctx.beginPath();
+    ctx.arc(28, 26, 21, 0, Math.PI * 2);
+    ctx.fillStyle = ball;
+    ctx.fill();
+    outline(ctx, INK, 2.8);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(20, 16, 6, 3, -0.6, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  makeCanvasTexture(scene, 'icon-lock', 38, 44, (ctx) => {
+    ctx.beginPath();
+    ctx.arc(19, 17, 9, Math.PI, 0);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#C0C0C8';
+    ctx.stroke();
+    celShape(ctx, () => {
+      ctx.beginPath();
+      ctx.rect(5, 18, 28, 22);
+    }, { base: '#E8B84A', shade: '#B88A1E', shadeShift: 2.5, lineWidth: 2.8 });
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.arc(19, 27, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(18, 28, 2.4, 6);
+  });
+
   // Globe for the language button
   makeCanvasTexture(scene, 'ui-globe', 72, 72, (ctx) => {
     celShape(ctx, ellipse(ctx, 36, 36, 29, 29), { base: '#3FA9E8', shade: '#1E6FB5', light: '#9BDCFF', lightShape: ellipse(ctx, 26, 22, 10, 5), shadeShift: 4, lineWidth: 3.4 });

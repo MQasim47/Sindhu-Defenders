@@ -6,6 +6,7 @@ import { playSfx } from '../fx/sound.js';
 const STYLES = {
   red: { top: 0xb0283c, bottom: 0x8e1b2b, edge: 0x5a0f1d },
   indigo: { top: 0x34419a, bottom: 0x1c2457, edge: 0x0f1438 },
+  locked: { top: 0x9a929e, bottom: 0x726b78, edge: 0x3a3640 }, // not available yet
 };
 
 // A chunky rounded button. The label is a text key from src/i18n. It grows on hover, squashes when pressed,
@@ -60,9 +61,9 @@ export default class Button extends Phaser.GameObjects.Container {
       });
     }
 
-    this.on('pointerover', () => this.grow(1.08, 1.08));
+    this.on('pointerover', () => this.enabled && this.grow(1.08, 1.08));
     this.on('pointerout', () => this.grow(1, 1));
-    this.on('pointerdown', () => this.grow(1.06, 0.88));
+    this.on('pointerdown', () => this.enabled && this.grow(1.06, 0.88));
     this.on('pointerup', () => {
       if (!this.enabled) return;
       this.grow(1.08, 1.08);

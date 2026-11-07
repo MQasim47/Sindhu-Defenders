@@ -3,6 +3,8 @@ import { createFxTextures } from '../fx/fxTextures.js';
 import { createGameTextures } from '../fx/uiTextures.js';
 import { createMithuTextures } from './mithuTextures.js';
 import { createNpcTextures } from './npcTextures.js';
+import { createJadugarTextures } from './jadugarTextures.js';
+import { createTrojanTextures } from './trojanTextures.js';
 import { makeCanvasTexture } from '../fx/canvasUtil.js';
 
 // Generated art. Each texture uses the key the final PNG will use,
@@ -14,6 +16,8 @@ export function createPlaceholderTextures(scene) {
   createGameTextures(scene);
   createMithuTextures(scene);
   createNpcTextures(scene);
+  createJadugarTextures(scene);
+  createTrojanTextures(scene);
 
   // Sand floor tile (only used when courtyard-bg is missing)
   makeCanvasTexture(scene, 'sand-tile', 256, 256, (ctx) => {

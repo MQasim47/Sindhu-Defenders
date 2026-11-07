@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import Button from '../ui/Button.js';
 import { COLORS, CSS, FONT } from '../data/colors.js';
-import { addText } from '../i18n/i18nText.js';
+import { addText, setSource } from '../i18n/i18nText.js';
+import BrainPanel from '../ui/BrainPanel.js';
+import { openResults } from '../ui/ResultsCard.js';
 import { t } from '../i18n/index.js';
 import { playSfx } from '../fx/sound.js';
 import { makeCanvasTexture, roundRectPath } from '../fx/canvasUtil.js';
@@ -35,6 +37,8 @@ export default class UIScene extends Phaser.Scene {
     this.buildCounters();
     this.buildTimer();
     this.buildFlights();
+    this.brainPanel = new BrainPanel(this);
+    this.tabKey = this.input.keyboard.addKey('TAB');
     this.ready = true;
   }
 
@@ -87,9 +91,9 @@ export default class UIScene extends Phaser.Scene {
   }
 
   buildCounters() {
-    const w = 330;
-    const x = 1280 - 20 - w;
-    [['caught', 'icon-caught', 16, 'hud.caught'], ['sneaked', 'icon-sneaked', 98, 'hud.sneaked']].forEach(([key, icon, y, label]) => {
+    const w = 300;
+    const x = 20;
+    [['caught', 'icon-caught', 100, 'hud.caught'], ['sneaked', 'icon-sneaked', 184, 'hud.sneaked']].forEach(([key, icon, y, label]) => {
       this.panel(x, y, w, 72);
       this.add.image(x + 44, y + 38, icon).setScale(1.0);
       addText(this, x + 80, y + 36, label, { fontFamily: FONT, fontSize: '28px', fontStyle: '600', color: CSS.cream }).setOrigin(0, 0.5);
@@ -108,7 +112,7 @@ export default class UIScene extends Phaser.Scene {
     this.timeText = this.add
       .text(640, 92, '1:00', { fontFamily: FONT, fontSize: '40px', fontStyle: '700', color: CSS.cream, stroke: '#10143a', strokeThickness: 7, resolution: 2 })
       .setOrigin(0.5);
-    addText(this, 640, 128, 'hud.wave', { fontFamily: FONT, fontSize: '22px', fontStyle: '600', color: CSS.gold, stroke: '#10143a', strokeThickness: 5 }).setOrigin(0.5);
+    this.phaseText = addText(this, 640, 128, 'hud.phase.intro', { fontFamily: FONT, fontSize: '24px', fontStyle: '600', color: CSS.gold, stroke: '#10143a', strokeThickness: 5 }).setOrigin(0.5);
     this.drawTimer(1);
   }
 
@@ -149,6 +153,14 @@ export default class UIScene extends Phaser.Scene {
   // ---------- Called by the Level ----------
 
   setTime(seconds, total) {
+    if (total <= 1) {
+      if (this.lastBar !== -2) {
+        this.lastBar = -2;
+        this.drawTimer(0);
+        this.timeText.setText('');
+      }
+      return;
+    }
     const left = Math.max(0, total - seconds);
     const step = Math.round((left / total) * 200);
     if (step === this.lastBar) return;
@@ -156,6 +168,25 @@ export default class UIScene extends Phaser.Scene {
     this.drawTimer(left / total);
     const s = Math.ceil(left);
     this.timeText.setText(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+  }
+
+  // what the timer is for: 'hud.phase.wave' with { n: 2 } ...
+  setPhase(key, vars) {
+    if (this.phaseKey === key && JSON.stringify(vars) === this.phaseVars) return;
+    this.phaseKey = key;
+    this.phaseVars = JSON.stringify(vars);
+    setSource(this.phaseText, key, vars);
+    this.bounce(this.phaseText);
+    this.lastBar = -1;
+  }
+
+  // the AI Hacker's brain panel
+  setBrain(state) {
+    this.brainPanel.setBrain(state);
+  }
+
+  setBrainThinking(on) {
+    this.brainPanel.setBrainThinking(on);
   }
 
   setCaught(n) {
@@ -229,6 +260,10 @@ export default class UIScene extends Phaser.Scene {
 
   update(time, delta) {
     const dt = delta / 1000;
+    if (this.ready) {
+      this.brainPanel.update(dt);
+      if (Phaser.Input.Keyboard.JustDown(this.tabKey)) this.brainPanel.toggle();
+    }
     for (const f of this.flights) {
       if (!f.active) continue;
       f.t += dt;
@@ -258,60 +293,9 @@ export default class UIScene extends Phaser.Scene {
 
   // ---------- Results ----------
 
-  showResults(stats) {
-    const total = stats.caught + stats.sneaked;
-    const stars = stats.sneaked === 0 ? 3 : stats.caught / total >= 0.6 ? 2 : 1;
-    const blocker = this.add.rectangle(640, 360, 1280, 720, 0x0b0d1a, 0.7).setInteractive().setDepth(100);
-    const card = this.add.container(640, 380).setDepth(101);
-    const w = 760;
-    const h = 600;
-    const g = this.add.graphics();
-    g.fillStyle(0x000000, 0.4);
-    g.fillRoundedRect(-w / 2, -h / 2 + 10, w, h, 34);
-    g.fillStyle(0x5a0f1d, 1);
-    g.fillRoundedRect(-w / 2 - 5, -h / 2 - 5, w + 10, h + 10, 36);
-    g.fillStyle(COLORS.cream, 1);
-    g.fillRoundedRect(-w / 2, -h / 2, w, h, 32);
-    g.fillStyle(COLORS.indigo, 1);
-    g.fillRoundedRect(-w / 2, -h / 2, w, 92, { tl: 32, tr: 32, bl: 0, br: 0 });
-    g.fillStyle(COLORS.red, 1);
-    g.fillRect(-w / 2, -h / 2 + 86, w, 7);
-    card.add(g);
-    card.add(
-      addText(this, 0, -h / 2 + 46, 'results.title', { fontFamily: FONT, fontSize: '54px', fontStyle: '700', color: CSS.cream, stroke: '#10143a', strokeThickness: 8 }).setOrigin(0.5),
-    );
-
-    // stars pop in one by one
-    for (let i = 0; i < 3; i++) {
-      const star = this.add.image(-130 + i * 130, -h / 2 + 170, i < stars ? 'ui-star' : 'ui-star-off').setScale(0).setAngle(-20);
-      card.add(star);
-      this.tweens.add({ targets: star, scale: i === 1 ? 1.5 : 1.25, angle: 0, duration: 420, delay: 500 + i * 320, ease: 'Back.Out' });
-    }
-
-    const rows = [
-      ['results.caught', stats.caught, 'icon-caught'],
-      ['results.sneaked', stats.sneaked, 'icon-sneaked'],
-      ['results.coins', `+${stats.earned}`, 'ui-coin'],
-    ];
-    rows.forEach(([label, value, icon], i) => {
-      const y = -h / 2 + 270 + i * 58;
-      card.add(this.add.image(-250, y, icon).setScale(0.85));
-      card.add(addText(this, -205, y, label, { fontFamily: FONT, fontSize: '34px', fontStyle: '600', color: CSS.indigo }).setOrigin(0, 0.5));
-      card.add(this.add.text(250, y, String(value), { fontFamily: FONT, fontSize: '42px', fontStyle: '700', color: CSS.red, resolution: 2 }).setOrigin(1, 0.5));
-    });
-
-    const mithuKey = stars >= 2 ? 'mithu.waveGood' : 'mithu.waveBad';
-    card.add(
-      addText(this, 0, h / 2 - 132, () => t('results.mithu', { line: t(mithuKey) }), { fontFamily: FONT, fontSize: '28px', fontStyle: '500', color: CSS.indigo, align: 'center', wordWrap: { width: 680 } }).setOrigin(0.5),
-    );
-    const retry = new Button(this, -150, h / 2 - 58, 'results.retry', () => this.again(), { width: 240, height: 76, fontSize: 34 });
-    const menu = new Button(this, 150, h / 2 - 58, 'results.menu', () => this.toMenu(), { width: 240, height: 76, fontSize: 34, style: 'indigo' });
-    card.add([retry, menu]);
-
-    card.setScale(0.6).setAlpha(0);
-    this.tweens.add({ targets: card, scale: 1, alpha: 1, duration: 340, ease: 'Back.Out' });
-    playSfx(this, 'sfx-win');
-    this.resultObjects = [blocker, card];
+  // data: see ResultsCard.js (the Level fills in everything except the two buttons)
+  showResults(data) {
+    this.resultObjects = openResults(this, { ...data, onRetry: () => this.again(), onMenu: () => this.toMenu() });
   }
 
   again() {

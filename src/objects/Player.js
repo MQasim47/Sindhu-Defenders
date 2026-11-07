@@ -53,6 +53,7 @@ export default class Player extends Phaser.GameObjects.Container {
     this.stepSide = 1;
     this.mouthWide = false;
     this.time = 0;
+    this.inputLocked = false; // true during the level intro
     this.lanternUp = false; // set by Lantern.js while Q is held
     this.aim = 0; // direction the lantern points (radians)
     this.slowTimer = 0; // seconds left of being slowed by a spam blob
@@ -197,19 +198,24 @@ export default class Player extends Phaser.GameObjects.Container {
     this.spriteMirrors = DODO_ART.mirrors.map(([mx, my]) => artToSprite(scene, mx, my, s));
     this.spriteGlint = add.image(0, 0, 'fx-glint').setScale(0).setBlendMode(Phaser.BlendModes.ADD);
 
-    // lantern: a raised arm (on the side Dodo faces) holding the lantern in front of him
+    // lantern: a round cream sleeve and a small mitten hand holding the lantern ring.
+    // The lantern hangs below the hand and swings like a pendulum.
     const shoulder = artToSprite(scene, DODO_ART.shoulder[0], DODO_ART.shoulder[1], s);
-    const armScale = 1.5;
-    const armAngle = 2.25;
-    const reach = 32 * armScale;
-    const hand = { x: shoulder.x - Math.sin(armAngle) * reach, y: shoulder.y + Math.cos(armAngle) * reach };
-    this.spriteArm = add.image(shoulder.x, shoulder.y, 'dodo-arm').setOrigin(0.5, 0.08).setScale(armScale).setRotation(armAngle).setVisible(false);
-    this.spriteLantern = add.image(hand.x - 2, hand.y - 3, 'prop-lantern').setOrigin(0.5, 0.15).setScale(1.1).setVisible(false);
-    this.spriteGlow = add.image(hand.x - 2, hand.y + 12, 'fx-glow').setScale(0.7).setAlpha(0.6).setBlendMode(Phaser.BlendModes.ADD).setVisible(false);
-    // the lantern light starts here (mirrored by facingDir in Lantern.js)
-    this.lanternHand = { x: Math.abs(hand.x) * BODY_SCALE, y: -hand.y * BODY_SCALE };
+    this.armAngle = 2.25;
+    const reach = 60 * 0.8 * 0.86; // length of the sleeve up to the wrist
+    const wrist = { x: shoulder.x - Math.sin(this.armAngle) * reach, y: shoulder.y + Math.cos(this.armAngle) * reach };
+    this.spriteSleeve = add.image(shoulder.x, shoulder.y, 'dodo-sleeve').setOrigin(0.5, 0.1).setScale(0.8).setRotation(this.armAngle).setVisible(false);
+    this.spriteSwing = add.container(wrist.x, wrist.y + 4).setVisible(false);
+    this.spriteLantern = add.image(0, 0, 'prop-lantern').setOrigin(0.5, 0.1).setScale(1.1);
+    this.spriteGlow = add.image(0, 20, 'fx-glow').setScale(0.7).setAlpha(0.6).setBlendMode(Phaser.BlendModes.ADD);
+    this.spriteSwing.add([this.spriteLantern, this.spriteGlow]);
+    this.spriteMitten = add.image(wrist.x, wrist.y + 1, 'dodo-mitten').setOrigin(0.5, 0.2).setScale(0.95).setRotation(this.armAngle - 3.14).setVisible(false);
+    this.swingAngle = 0;
+    this.swingSpeed = 0;
+    // the lantern light starts at the glass of the lantern (mirrored by facingDir in Lantern.js)
+    this.lanternHand = { x: Math.abs(wrist.x) * BODY_SCALE, y: -(wrist.y + 26) * BODY_SCALE };
 
-    this.facing.add([this.sprite, ...this.lids, this.spriteGlint, this.spriteArm, this.spriteLantern, this.spriteGlow]);
+    this.facing.add([this.sprite, ...this.lids, this.spriteGlint, this.spriteSleeve, this.spriteSwing, this.spriteMitten]);
     this.facing.setScale(this.facingDir * this.flipSign, 1);
   }
 
@@ -291,6 +297,7 @@ export default class Player extends Phaser.GameObjects.Container {
 
   turn(direction) {
     this.facingDir = direction;
+    if (this.spriteMode && this.swingSpeed !== undefined) this.swingSpeed -= 5 * direction * this.flipSign;
     this.scene.tweens.killTweensOf(this.facing);
     this.scene.tweens.add({
       targets: this.facing,
@@ -353,8 +360,9 @@ export default class Player extends Phaser.GameObjects.Container {
     this.time += dt;
     const k = this.keys;
 
-    let inputX = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0);
-    let inputY = (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0);
+    const free = !this.inputLocked;
+    let inputX = free ? (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0) : 0;
+    let inputY = free ? (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0) : 0;
     const pressing = inputX !== 0 || inputY !== 0;
     if (inputX !== 0 && inputY !== 0) {
       inputX *= Math.SQRT1_2;
@@ -410,7 +418,7 @@ export default class Player extends Phaser.GameObjects.Container {
 
   updateJumpState(dt) {
     this.stateTime += dt;
-    const wantsJump = Phaser.Input.Keyboard.JustDown(this.keys.jump);
+    const wantsJump = Phaser.Input.Keyboard.JustDown(this.keys.jump) && !this.inputLocked;
 
     if (this.state === 'ground' || this.state === 'land') {
       if (wantsJump) this.startJump();
@@ -528,10 +536,18 @@ export default class Player extends Phaser.GameObjects.Container {
     this.sprite.rotation += (lean + sway + shake - this.sprite.rotation) * Math.min(1, dt * 16);
 
     const up = this.lanternUp;
-    this.spriteArm.setVisible(up);
-    this.spriteLantern.setVisible(up);
-    this.spriteGlow.setVisible(up);
-    this.spriteArm.rotation = 2.25 + (up ? Math.sin(this.time * 3) * 0.04 : 0);
+    this.spriteSleeve.setVisible(up);
+    this.spriteSwing.setVisible(up);
+    this.spriteMitten.setVisible(up);
+    if (!up) return;
+
+    this.spriteSleeve.rotation = this.armAngle + Math.sin(this.time * 3) * 0.03;
+    // pendulum: the lantern lags behind when Dodo moves or turns
+    const side = Math.sign(this.facing.scaleX) || 1;
+    const target = Phaser.Math.Clamp((this.vx / MAX_SPEED) * 0.6 * side, -0.75, 0.75) + Math.sin(this.time * 2.6) * 0.05;
+    this.swingSpeed += ((target - this.swingAngle) * 75 - this.swingSpeed * 4.2) * dt;
+    this.swingAngle += this.swingSpeed * dt;
+    this.spriteSwing.rotation = this.swingAngle;
   }
 
   // The cape is 4 strips. Each one is pulled towards its own target angle by a

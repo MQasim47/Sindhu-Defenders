@@ -28,7 +28,7 @@ No screens of links or messages to read under time pressure. Every attack is a m
 3. **Natija (result):** stars, coins, and what the AI learned about you.
 
 ## Controls (simple enough for a class-7 student)
-Arrow keys / WASD to move · **Space** = jump · hold **Q** = Sach ki Lalten (scan) · **E** = pick up / place / use · On-screen buttons for touch.
+Arrow keys / WASD to move · **Space** = jump · hold **Q** = Sach ki Lalten (scan) · **E** = greet a friend / sweep bugs with the Antivirus Jharoo (later: pick up / place) · On-screen buttons for touch.
 
 ## Levels (scope for 5 days)
 1. Sann Gate — Behroopia Qasid (phishing) + Trojan Ghoda

@@ -1,5 +1,5 @@
 import { newCanvas } from '../fx/canvasUtil.js';
-import { WALK, START, GATE, CENTER, OBJECTS, PALMS } from './courtyardData.js';
+import { WALK, START, GATE, CENTER, JADUGAR_SPOT, OBJECTS, PALMS } from './courtyardData.js';
 
 const SCALE = 1.0; // world pixels per pixel of the full-size picture
 const PIC = 2000; // width of the "measuring copy" used in courtyardData.js
@@ -56,6 +56,7 @@ export function buildCourtyardArt(scene) {
     start: { x: START.x * k, y: START.y * k },
     gate: { x: GATE.x * k, y: GATE.y * k },
     center: { x: CENTER.x * k, y: CENTER.y * k },
+    jadugar: { x: JADUGAR_SPOT.x * k, y: JADUGAR_SPOT.y * k },
     bounds: makeBounds(k),
   };
 }
