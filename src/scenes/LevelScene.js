@@ -263,6 +263,8 @@ export default class LevelScene extends Phaser.Scene {
       weakness: this.brain.biggestWeakness(),
       tally: { ...tally },
       nextNameKey: this.levelData.nextNameKey,
+      nextLocked: stars < 1, // Amri Gate opens with at least 1 star
+      nextSceneKey: 'Level2',
     });
   }
 

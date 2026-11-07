@@ -39,20 +39,24 @@ Arrow keys / WASD to move · **Space** = jump · hold **Q** = Sach ki Lalten (Do
 - If Ollama is not running, the proxy answers with a harmless JSON message (no 404/500 in the browser console).
 
 ## Levels (scope for 5 days)
-1. Sann Gate — Behroopia Qasid (phishing) + Trojan Ghoda
-2. Amri Gate — Hathoda Dev (passwords) + Taala Bhoot (backup)
-3. Boss at Miri Fort — Nakal Jadugar (deepfake)
-Shah-Pere and Mohan gates shown as "Coming soon" on the map. Two perfect levels + boss beat four rough ones.
+1. **Sann Gate** (built) - Behroopia Qasid (phishing) + Trojan Ghoda. Steps: intro, Tayyari, wave 1 (villagers + Behroopias), AI re-plan, wave 2 (adds the Trojan Ghoda, driven by HackerBrain's plan), results (about 2 minutes). Finishing with at least 1 star unlocks Amri Gate.
+2. **Amri Gate** (built, scene `Level2`) - Hathoda Dev (passwords) + Taala Bhoot (ransomware + backup). Steps: intro, Tayyari (about 25 s), wave 1 (Hathoda only), AI re-plan, wave 2 (Hathoda + Taala), results.
+   - Three wall sections (LEFT, CENTER, RIGHT), each with a password plaque. Password **bricks** (lowercase clay brown, UPPERCASE red, numbers blue, symbols gold) lie around the yard. **E** picks up a brick (Dodo carries up to 3 on his head) and places the top one on a wall section's password. Strength comes from **zxcvbn** (`src/ai/passwordAI.js`), shown as the password, a strength bar and the crack time in words. Weak = cracked and dull, medium = solid, strong = glowing gold edge.
+   - **Hathoda Dev** walks to the wall section HackerBrain chooses and hammers it. Damage per hit goes down with the crack time (log scale). Weak walls break, strong walls are barely chipped (he gets tired and gives up). Each hit sends a shockwave ring: jump over it (Space) or Dodo is knocked back and drops his bricks. A broken wall can be rebuilt with new bricks.
+   - **Backup Scrolls** appear next to the three buildings (Kutubkhana, Anaaj Ghar, Ghar). Carry one to the Kutubkhana shelf and press E to back that building up (blue badge). **Taala Bhoot** (ghost with a padlock) chains a building chosen by HackerBrain (buildings without a backup first) and it slowly drains coins. E at the building: backed up = instant restore, not backed up = an 8 second unlock bar.
+   - Background: `public/assets/backgrounds/amri-gate-bg.*` if present (the walking area is set in `src/level/amriArt.js`), otherwise the Level 1 courtyard with a reddish tint.
+3. Boss at Miri Fort - Nakal Jadugar (deepfake) (planned)
+A level chooser ("Levels" on the title screen) shows the cards with stars and locks until the World Map exists. Stars are saved in localStorage (`src/data/progress.js`).
 
 ## AI systems (must be real, visible and explainable to a 13-year-old)
-1. **Adaptive AI Hacker (Jadugar)** — tracks, per attack type and per variant, how often the player fails (`(fails+1)/(faced+2)`). It adapts three things: which monster types to send, which disguises the phishers use (e.g. if the player never scans "old lady" villagers, more phishers disguise as old ladies), and which wall side the brutes attack (the weakest one). Exploit ~85%, explore ~15%. Keep the logic in one small readable module: `src/ai/HackerBrain.js`.
+1. **Adaptive AI Hacker (Jadugar)** — tracks, per attack type and per variant, how often the player fails (`(fails+1)/(faced+2)`). It adapts three things: which monster types to send, which disguises the phishers use (e.g. if the player never scans "old lady" villagers, more phishers disguise as old ladies), and which wall side the brutes attack (the weakest one). Exploit ~85%, explore ~15%. Keep the logic in one small readable module: `src/ai/HackerBrain.js`. Level 2 adds the items `wall_left`, `wall_center`, `wall_right` (fail = section broken) and `building_kutubkhana`, `building_anaaj`, `building_ghar` (fail = locked without a backup); the same formula and rule are used.
 2. **Jadugar portrait** (top-right of the HUD, round frame with an Ajrak border): the live "AI ka Dimagh" panel was removed. The portrait smirks when idle, laughs when something gets in, looks angry when Dodo catches one, and its crystal ball glows while the AI re-plans. HackerBrain is unchanged: it still drives the waves and the results report.
-3. **Password AI** — zxcvbn estimates crack time ("3 second" vs "400 saal").
+3. **Password AI** (`src/ai/passwordAI.js`) — zxcvbn estimates the crack time of every wall password ("3 seconds" vs "400 years"); it also sets how hard Hathoda's hammer hits.
 4. **End report** — "AI Hacker ki report": biggest weakness + one tip, plus a running "Insaan vs AI Hacker" tally.
 
 ## Tech
 - **Phaser 4** (latest stable) + **Vite**, plain JavaScript (ES modules). No TypeScript.
-- Scenes: `Boot`, `Preload`, `Menu`, `CharacterSelect`, `WorldMap`, `Level`, `UI` (HUD runs in parallel scene), `Report`.
+- Scenes: `Boot`, `Preload`, `Menu`, `CharacterSelect`, `WorldMap`, `Level` (Level 1), `Level2` (Level 2), `UI` (HUD runs in parallel scene), `Report`.
 - Folder layout:
   ```
   src/

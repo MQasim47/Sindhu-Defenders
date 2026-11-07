@@ -5,6 +5,7 @@ import MenuScene from './scenes/MenuScene.js';
 import CharacterSelectScene from './scenes/CharacterSelectScene.js';
 import WorldMapScene from './scenes/WorldMapScene.js';
 import LevelScene from './scenes/LevelScene.js';
+import Level2Scene from './scenes/Level2Scene.js';
 import UIScene from './scenes/UIScene.js';
 import ReportScene from './scenes/ReportScene.js';
 import { setupFpsMeter } from './ui/FpsMeter.js';
@@ -33,6 +34,7 @@ const config = {
     CharacterSelectScene,
     WorldMapScene,
     LevelScene,
+    Level2Scene,
     UIScene,
     ReportScene,
   ],

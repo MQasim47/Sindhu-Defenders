@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import Button from '../ui/Button.js';
 import { createLogoTitle, createRibbon } from '../ui/LogoText.js';
 import { openPanel } from '../ui/Panel.js';
+import { openLevelSelect } from '../ui/LevelSelect.js';
 import { openChat } from '../ui/chat/ChatPanel.js';
 import { t } from '../i18n/index.js';
 import Player from '../objects/Player.js';
@@ -241,13 +242,14 @@ export default class MenuScene extends Phaser.Scene {
   buildButtons() {
     const x = 940;
     const defs = [
-      { label: 'menu.play', y: 350, opts: { width: 380, height: 108, fontSize: 54, pulse: true }, action: () => this.startGame() },
-      { label: 'menu.howTo', y: 472, opts: { width: 320, height: 74, fontSize: 30, style: 'indigo' }, action: () => this.showHowTo() },
-      { label: 'menu.askMithu', y: 646, opts: { width: 320, height: 66, fontSize: 28, style: 'indigo' }, action: () => this.askMithu() },
-      { label: 'menu.settings', y: 560, opts: { width: 320, height: 74, fontSize: 30, style: 'indigo' }, action: () => this.showSettings() },
+      { label: 'menu.play', x, y: 330, opts: { width: 380, height: 104, fontSize: 52, pulse: true }, action: () => this.startGame() },
+      { label: 'menu.levels', x, y: 430, opts: { width: 330, height: 66, fontSize: 30, style: 'indigo' }, action: () => this.showLevels() },
+      { label: 'menu.howTo', x: x - 85, y: 518, opts: { width: 165, height: 62, fontSize: 22, style: 'indigo' }, action: () => this.showHowTo() },
+      { label: 'menu.settings', x: x + 85, y: 518, opts: { width: 165, height: 62, fontSize: 22, style: 'indigo' }, action: () => this.showSettings() },
+      { label: 'menu.askMithu', x, y: 604, opts: { width: 330, height: 66, fontSize: 28, style: 'indigo' }, action: () => this.askMithu() },
     ];
     this.buttons = defs.map((d, i) => {
-      const button = new Button(this, x, d.y, d.label, d.action, d.opts).setDepth(20);
+      const button = new Button(this, d.x, d.y, d.label, d.action, d.opts).setDepth(20);
       button.setScale(0);
       this.tweens.add({ targets: button, scale: 1, duration: 450, delay: 700 + i * 130, ease: 'Back.Out' });
       return button;
@@ -271,6 +273,19 @@ export default class MenuScene extends Phaser.Scene {
       pulse.stop();
       this.tweens.add({ targets: text, alpha: 0, duration: 300, onComplete: () => text.destroy() });
     });
+  }
+
+  // choose a level (Sann Gate or Amri Gate)
+  showLevels() {
+    openLevelSelect(this, (sceneKey) => this.startLevel(sceneKey));
+  }
+
+  startLevel(sceneKey) {
+    if (this.leaving) return;
+    this.leaving = true;
+    playSfx(this, 'sfx-click');
+    this.cameras.main.fadeOut(500, 11, 13, 26);
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start(sceneKey));
   }
 
   // the chat with Mithu (the last game, if there was one, gives him real numbers to talk about)

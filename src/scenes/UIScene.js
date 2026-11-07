@@ -96,7 +96,8 @@ export default class UIScene extends Phaser.Scene {
   buildCounters() {
     const w = 300;
     const x = 20;
-    [['caught', 'icon-caught', 100, 'hud.caught'], ['sneaked', 'icon-sneaked', 184, 'hud.sneaked']].forEach(([key, icon, y, label]) => {
+    const names = this.config.counterKeys || ['hud.caught', 'hud.sneaked'];
+    [['caught', 'icon-caught', 100, names[0]], ['sneaked', 'icon-sneaked', 184, names[1]]].forEach(([key, icon, y, label]) => {
       this.panel(x, y, w, 72);
       this.add.image(x + 44, y + 38, icon).setScale(1.0);
       addText(this, x + 80, y + 36, label, { fontFamily: FONT, fontSize: '28px', fontStyle: '600', color: CSS.cream }).setOrigin(0, 0.5);
@@ -296,13 +297,25 @@ export default class UIScene extends Phaser.Scene {
   // data: see ResultsCard.js (the Level fills in everything except the two buttons)
   showResults(data) {
     this.resultsOpen = true;
-    this.resultObjects = openResults(this, { ...data, onRetry: () => this.again(), onMenu: () => this.toMenu() });
+    this.resultObjects = openResults(this, { ...data, onRetry: () => this.again(), onMenu: () => this.toMenu(), onNext: () => this.goTo(data.nextSceneKey) });
   }
 
   again() {
     const level = this.levelScene;
     level.scene.resume();
     level.scene.restart(); // the Level starts a fresh HUD itself
+  }
+
+  // go to another level (a scene key such as 'Level2')
+  goTo(sceneKey) {
+    if (!sceneKey) return;
+    const level = this.levelScene;
+    level.scene.resume();
+    level.cameras.main.fadeOut(400, 11, 13, 26);
+    level.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.stop();
+      level.scene.start(sceneKey);
+    });
   }
 
   toMenu() {

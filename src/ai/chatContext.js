@@ -4,7 +4,10 @@ import { tEn } from '../i18n/index.js';
 // A "snapshot" is a plain object. It is made from the Level scene while the game runs,
 // and saved in the game registry so the title screen can still use the last one.
 
-const NAMES = ['chacha', 'amma', 'bacha', 'phishing', 'trojan'];
+const BASE_NAMES = ['chacha', 'amma', 'bacha', 'phishing', 'trojan'];
+const ALL_NAMES = [...BASE_NAMES, 'wall_left', 'wall_center', 'wall_right', 'building_kutubkhana', 'building_anaaj', 'building_ghar'];
+// the names that matter now: the Level 1 ones always, the Level 2 ones once the AI used them
+const namesOf = (b) => ALL_NAMES.filter((n) => BASE_NAMES.includes(n) || b.counts[n].faced > 0 || b.counts[n].fails > 0);
 const label = (name) => tEn(`brain.names.${name}`);
 
 // Reads HackerBrain.getState() and the score from the Level scene.
@@ -49,7 +52,7 @@ export function contextToText(snap) {
     `- Score: caught ${snap.stats.caught}, got in ${snap.stats.sneaked}, gifts opened ${snap.stats.giftsOpened}, gifts checked with lantern ${snap.stats.giftsRevealed}, coins earned ${snap.stats.earned}.`,
   );
   lines.push(`- The AI has made ${b.plans} plan(s). Its last decision was: ${b.mode}.`);
-  NAMES.forEach((n) => {
+  namesOf(b).forEach((n) => {
     const c = b.counts[n];
     lines.push(`- ${label(n)}: sent ${c.faced} times, player failed ${c.fails} times, weakness score ${b.weakness[n].toFixed(2)}, share in next plan ${Math.round((b.weights[n] || 0) * 100)}%.`);
   });
@@ -61,7 +64,7 @@ export function contextToText(snap) {
 export function describeLearning(snap) {
   if (!snap) return 'We have not played a round yet, so the AI has not learned anything about you. Play Level 1 and ask me again!';
   const b = snap.brain;
-  const failed = NAMES.filter((n) => b.counts[n].fails > 0).sort((x, y) => b.weakness[y] - b.weakness[x]);
+  const failed = namesOf(b).filter((n) => b.counts[n].fails > 0).sort((x, y) => b.weakness[y] - b.weakness[x]);
   const parts = [];
   if (failed.length) {
     const top = failed
@@ -72,7 +75,7 @@ export function describeLearning(snap) {
   } else {
     parts.push('So far you have not failed against anything, so all weakness scores are low. Keep checking before you trust!');
   }
-  const best = NAMES.reduce((a, c) => ((b.weights[c] || 0) > (b.weights[a] || 0) ? c : a));
+  const best = namesOf(b).reduce((a, c) => ((b.weights[c] || 0) > (b.weights[a] || 0) ? c : a));
   parts.push(`Its latest plan was to ${b.mode === 'explore' ? 'explore something new' : 'exploit your weak spots'}, with ${label(best)} at ${Math.round((b.weights[best] || 0) * 100)}%.`);
   parts.push(`So far you caught ${snap.stats.caught} and ${snap.stats.sneaked} got in.`);
   return parts.join(' ');

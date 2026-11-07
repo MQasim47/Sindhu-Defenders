@@ -1,14 +1,17 @@
-// Level data. Level 1 = Sann Gate. Everything that changes the feel of a level is here.
+// Level data. Everything that changes the feel of a level is here.
 //
 // A level is a list of steps, played one after another:
 //   intro  - the camera shows the Jadugar, then flies to Dodo
-//   prep   - Tayyari: free movement and short hints
-//   wave   - monsters come through the gate (spawn numbers below)
+//   prep   - Tayyari: free movement, collect things, get ready
+//   wave   - the attacks come (spawn numbers below)
 //   replan - the spawning stops, the AI Hacker "thinks" and plans the next wave
 export const LEVELS = {
+  // ---------- Level 1: Sann Gate (phishing + trojan) ----------
   sann: {
     id: 'sann',
+    sceneKey: 'Level',
     nameKey: 'level.sann',
+    nextId: 'amri',
     nextNameKey: 'level.amri',
     startCoins: 10,
     safeCoins: 2, // coins a real villager brings
@@ -38,26 +41,57 @@ export const LEVELS = {
       {
         type: 'wave',
         n: 2,
-        duration: 45,
+        duration: 55,
         trojan: true,
         phases: [
-          { until: 15, interval: [3.2, 4.2], monsterChance: 0.34, speed: 0.95 },
-          { until: 45, interval: [2.4, 3.4], monsterChance: 0.42, speed: 1.0 },
+          { until: 20, interval: [3.0, 4.0], monsterChance: 0.4, speed: 0.95 },
+          { until: 55, interval: [2.2, 3.0], monsterChance: 0.5, speed: 1.05 },
         ],
       },
-      { type: 'replan', allowTrojan: true },
+    ],
+  },
+
+  // ---------- Level 2: Amri Gate (passwords + backups) ----------
+  amri: {
+    id: 'amri',
+    sceneKey: 'Level2',
+    nameKey: 'level.amri',
+    nextId: 'miri',
+    nextNameKey: 'level.miri',
+    startCoins: 10,
+    stealAmount: 3, // coins Hathoda Dev steals when he gets in
+    drainEvery: 2.6, // seconds between two coins lost to a locked building
+    maxThreats: 5, // never more than this many dangers at once
+    maxHathoda: 2,
+    maxTaala: 2,
+    counterKeys: ['hud.stopped', 'hud.damage'], // the two counters of the HUD
+    firstPlan: { level2: true, allowTaala: false },
+    // the password every wall section starts with (all weak, so the player must improve them)
+    startPasswords: { wall_left: 'abc', wall_center: 'password', wall_right: '1234' },
+    steps: [
+      { type: 'intro', duration: 8 },
+      { type: 'prep', duration: 25 },
       {
         type: 'wave',
-        n: 3,
+        n: 1,
         duration: 45,
-        trojan: true,
-        phases: [
-          { until: 15, interval: [2.4, 3.2], monsterChance: 0.42, speed: 1.0 },
-          { until: 45, interval: [1.8, 2.6], monsterChance: 0.5, speed: 1.1 },
-        ],
+        hathoda: true,
+        taala: false,
+        hathodaEvery: [9, 12],
+      },
+      { type: 'replan', plan: { level2: true, allowTaala: true } },
+      {
+        type: 'wave',
+        n: 2,
+        duration: 50,
+        hathoda: true,
+        taala: true,
+        hathodaEvery: [10, 13],
+        taalaEvery: [11, 15],
       },
     ],
   },
 };
 
 export const FIRST_LEVEL = 'sann';
+export const LEVEL_ORDER = ['sann', 'amri'];

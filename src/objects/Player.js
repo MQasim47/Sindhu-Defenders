@@ -57,6 +57,8 @@ export default class Player extends Phaser.GameObjects.Container {
     this.lanternUp = false; // set by Lantern.js while Q is held
     this.aim = 0; // direction the lantern points (radians)
     this.slowTimer = 0; // seconds left of being slowed by a spam blob
+    this.stunTimer = 0; // seconds left of being knocked back
+    this.hurtTimer = 0; // short protection after a hit
 
     // squash/stretch is a small spring, so it overshoots like rubber
     this.sq = { x: 1, y: 1, vx: 0, vy: 0, tx: 1, ty: 1 };
@@ -341,6 +343,15 @@ export default class Player extends Phaser.GameObjects.Container {
     this.emit('landed');
   }
 
+  // Hathoda's shockwave: Dodo is thrown back for a moment (dir = -1 left, 1 right)
+  knockback(dir) {
+    this.vx = dir * 560;
+    this.vy = 120;
+    this.stunTimer = 0.45;
+    this.wobble = 0.9;
+    this.pulse(1.3, 0.72);
+  }
+
   // A spam blob hit Dodo: slower for 2 seconds.
   getSlimed() {
     this.slowTimer = 2;
@@ -361,7 +372,8 @@ export default class Player extends Phaser.GameObjects.Container {
     const k = this.keys;
 
     // while the lantern is up, the arrow keys turn the beam (see Lantern.js), so Dodo stands still
-    const free = !this.inputLocked && !this.lanternUp;
+    if (this.stunTimer > 0) this.stunTimer -= dt;
+    const free = !this.inputLocked && !this.lanternUp && !(this.stunTimer > 0);
     let inputX = free ? (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0) : 0;
     let inputY = free ? (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0) : 0;
     const pressing = inputX !== 0 || inputY !== 0;

@@ -23,11 +23,33 @@ MONSTERS AND LESSONS
 - Nakal Jadugar = deepfake boss (planned for level 3). He copies Mithu. Lesson: use a secret family code word to check who is real.
 
 LEVELS
-- Level 1 is Sann Gate: villagers, Behroopia Qasid and Trojan Ghoda. It has an intro, a prepare time and three waves. After waves 1 and 2 the AI re-plans.
-- Level 2 is Amri Gate (planned). Level 3 is the boss at Miri Fort (planned).
+- Level 1 is Sann Gate: villagers, Behroopia Qasid and Trojan Ghoda. It has an intro, a prepare time (Tayyari) and two waves. After wave 1 the AI re-plans, and wave 2 adds the Trojan Ghoda.
+- Level 2 is Amri Gate: passwords and backups. Three wall sections (LEFT, CENTER, RIGHT) protect the fort, and each has a password on a stone plaque. Hathoda Dev hammers a wall section; Taala Bhoot, a ghost with a padlock, locks a building.
+- Level 2 buildings: Kutubkhana (library, with the backup shelf), Anaaj Ghar (granary) and Ghar (house).
+- Level 2 flow: intro, Tayyari (collect bricks, build walls, store scrolls), wave 1 (Hathoda Dev), AI re-plan, wave 2 (Hathoda Dev and Taala Bhoot), results.
+- A boss level at Miri Fort (Nakal Jadugar, deepfake) is planned next.
+
+PASSWORD BRICKS (LEVEL 2)
+- Bricks lie around the courtyard: lowercase letters are clay brown, UPPERCASE are red, numbers are blue and symbols like @#!$ are gold.
+- Press E to pick up a brick. Dodo can carry up to 3 on his head. Press E near a wall section to add the top brick to that section's password.
+- The password strength comes from zxcvbn, a real password strength checker. It knows common words, names, keyboard patterns and number runs, so 1234, abc and password are weak even if you add one more letter.
+- The plaque shows the password, a strength bar and the crack time in words, like 3 seconds, 2 days or 400 years. The wall looks cracked and dull when weak, solid when medium, and has a glowing gold edge when strong.
+- Hathoda Dev's hammer damage goes down with the crack time (on a log scale). A weak wall breaks in a few hits. A strong wall is barely chipped, and Hathoda gets tired and gives up.
+- Each hammer hit makes a shockwave ring on the ground. Jump over it with Space. If it hits Dodo he is knocked back and drops his bricks.
+- A broken wall can be rebuilt by placing new bricks.
+
+BACKUPS (LEVEL 2)
+- During Tayyari a glowing Backup Scroll appears next to each building. Carry it to the shelf at the Kutubkhana and press E to store it. The building then gets a blue "backed up" badge.
+- Taala Bhoot floats to a building and locks it with chains and a big padlock (this is ransomware). A locked building slowly drains coins.
+- Press E at the locked building. If it was backed up, it is restored at once. If not, unlocking takes 8 seconds while coins keep draining.
+
+HOW THE AI PICKS TARGETS IN LEVEL 2
+- HackerBrain also keeps data for each wall section and each building. A wall section fails when it breaks. A building fails when it is locked without a backup.
+- Hathoda Dev goes to the wall section with the highest weakness score (a tie goes to the weakest password). Taala Bhoot goes to buildings without a backup first.
+- The same formula and the same 85 percent exploit / 15 percent explore rule are used.
 
 CONTROLS
-- Move with arrow keys or WASD. Jump with Space. Hold Q to raise the lantern, then use the arrow keys or WASD to aim the light beam. Press E to greet a real villager or to sweep bugs. Esc pauses the game.
+- Move with arrow keys or WASD. Jump with Space. Hold Q to raise the lantern, then use the arrow keys or WASD to aim the light beam. Press E to greet a real villager, sweep bugs, pick up and place bricks, carry scrolls and unlock buildings. Esc pauses the game.
 
 HOW THE AI HACKER WORKS (HackerBrain)
 - It follows three steps: data, learning, decision.
@@ -122,7 +144,7 @@ export const FAQ = [
   },
   {
     q: ['what is brute force', 'what is a brute force attack', 'how do hackers guess passwords'],
-    a: 'Brute force means a hacker tries thousands of passwords until one works. Long and mixed passwords take much longer to guess, so they are safer.',
+    a: 'Brute force means a hacker tries thousands of passwords until one works. Long and mixed passwords take much longer to guess, so they are safer. In Level 2, Hathoda Dev hammers weak password walls.',
   },
   {
     q: ['what is malware', 'what is a virus', 'what is a computer virus', 'explain malware'],
@@ -138,7 +160,7 @@ export const FAQ = [
   },
   {
     q: ['what is ransomware', 'explain ransomware', 'what is taala bhoot'],
-    a: 'Ransomware locks your files and asks for money to unlock them. A backup lets you restore your files without paying. Taala Bhoot, the lock ghost, will teach this in level 2.',
+    a: 'Ransomware locks your files and asks for money to unlock them. A backup lets you restore your files without paying. Taala Bhoot, the lock ghost, teaches this in Level 2.',
   },
   {
     q: ['what is a backup', 'why make a backup', 'why are backups important'],
@@ -182,7 +204,7 @@ export const FAQ = [
   },
   {
     q: ['what are the levels', 'how many levels', 'what is level 1', 'what comes next', 'level list'],
-    a: 'Level 1 is Sann Gate with Behroopia Qasid and the Trojan Ghoda. Level 2 at Amri Gate and a boss level at Miri Fort are planned next.',
+    a: 'Level 1 is Sann Gate with Behroopia Qasid and the Trojan Ghoda. Level 2 is Amri Gate with passwords and backups. A boss level at Miri Fort is planned next.',
   },
   {
     q: ['what tools were used', 'how was the game made', 'what technology did you use', 'which software', 'how was it built', 'what is phaser', 'what is vite'],
@@ -195,6 +217,46 @@ export const FAQ = [
   {
     q: ['why did you make this game', 'what is the purpose', 'what is stream', 'why cyber security'],
     a: 'It was made for the Sindh STREAM Journey 2026-27 competition, about AI, gamification and cyber security. It teaches cyber safety by playing, not by reading.',
+  },
+  {
+    q: ['what is level 2', 'tell me about amri gate', 'what happens in level 2', 'how do i play level 2', 'what is the second level'],
+    a: 'Level 2 is Amri Gate. You build strong passwords for three wall sections with bricks, and you store backup scrolls for three buildings. Hathoda Dev hammers the walls and Taala Bhoot locks the buildings.',
+  },
+  {
+    q: ['what are the bricks', 'how do bricks work', 'what are password bricks', 'how do i place bricks', 'what do the brick colours mean'],
+    a: 'Each brick is one character of a password: lowercase is brown, UPPERCASE is red, numbers are blue and symbols are gold. Press E to pick one up, and press E near a wall to add it to that wall\'s password.',
+  },
+  {
+    q: ['what is zxcvbn', 'how is password strength calculated', 'how does the game rate passwords', 'who decides the password strength', 'why is 1234 weak'],
+    a: 'The game uses zxcvbn, a real password strength checker. It knows common words, names and patterns like 1234 or abc, so those are weak even with an extra letter. Long and mixed passwords with no pattern are strong.',
+  },
+  {
+    q: ['what is crack time', 'what does cracked in mean', 'how long to crack a password', 'what is the time on the plaque', 'what is the strength bar'],
+    a: 'The crack time is how long a hacker would need to guess the password. It can be 3 seconds for a weak one or hundreds of years for a strong one. The strength bar and the wall look show it too.',
+  },
+  {
+    q: ['who is hathoda dev', 'what is hathoda', 'how do i stop hathoda', 'how do i beat hathoda dev', 'what does hathoda do'],
+    a: 'Hathoda Dev is a big strongman who hammers a wall section. A weak password breaks fast, but a strong one is barely chipped and he gives up. Add bricks to make the wall password longer and mixed.',
+  },
+  {
+    q: ['what is taala bhoot', 'who is taala bhoot', 'what is the ghost', 'how do i unlock a building', 'what does the padlock ghost do'],
+    a: 'Taala Bhoot is a ghost with a padlock that locks a building, like ransomware locks your files. If you stored a backup scroll, press E at the building to restore it at once. Without a backup it takes 8 seconds and coins keep draining.',
+  },
+  {
+    q: ['what is a backup scroll', 'how do backups work in the game', 'where do i store the scrolls', 'what is the kutubkhana', 'what is the shelf'],
+    a: 'A Backup Scroll is a spare copy for one building. Carry it to the shelf at the Kutubkhana (the library) and press E. That building then has a blue badge and Taala Bhoot cannot hurt it for long.',
+  },
+  {
+    q: ['what are the buildings', 'what is anaaj ghar', 'what is the ghar', 'which buildings are in level 2'],
+    a: 'Level 2 has three buildings: the Kutubkhana (library, with the backup shelf), the Anaaj Ghar (granary) and the Ghar (house). Taala Bhoot tries to lock them.',
+  },
+  {
+    q: ['how does the ai pick the weakest wall', 'how does hathoda choose a wall', 'how does the ai choose a target in level 2', 'which wall does the ai attack', 'how does taala choose a building'],
+    a: 'HackerBrain keeps a weakness score for every wall section and building. Hathoda goes to the wall with the highest score (a tie goes to the weakest password), and Taala Bhoot goes to buildings without a backup first.',
+  },
+  {
+    q: ['what is the shockwave', 'what is the ring on the ground', 'how do i avoid hathoda hammer', 'why did i drop my bricks'],
+    a: 'Each hammer hit sends a shockwave ring along the ground. Jump over it with Space. If it hits you, you are knocked back and drop what you carry.',
   },
   {
     q: ['hello', 'hi', 'hey', 'salaam', 'assalam o alaikum'],

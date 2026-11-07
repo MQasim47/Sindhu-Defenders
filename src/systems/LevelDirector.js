@@ -23,7 +23,7 @@ export default class LevelDirector {
   }
 
   start() {
-    this.brain.plan({ allowTrojan: false }); // the first plan: nothing known yet
+    this.brain.plan(this.level.firstPlan || { allowTrojan: false }); // the first plan: nothing known yet
     this.next();
   }
 
@@ -85,7 +85,7 @@ export default class LevelDirector {
       }
     } else if (this.phase === 'think') {
       if (this.timer >= REPLAN_THINK) {
-        this.brain.plan({ allowTrojan: this.step.allowTrojan });
+        this.brain.plan(this.step.plan || { allowTrojan: this.step.allowTrojan });
         this.scene.hud('setJadugarThinking', false);
         this.phase = 'pause';
         this.timer = 0;

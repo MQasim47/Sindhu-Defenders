@@ -43,8 +43,8 @@ export function openResults(scene, data) {
     scene.tweens.add({ targets: star, scale: i === 1 ? 1.35 : 1.1, angle: 0, duration: 420, delay: 500 + i * 300, ease: 'Back.Out' });
   }
 
-  // numbers in two columns
-  const rows = [
+  // numbers in two columns (each level can give its own rows)
+  const rows = data.rows || [
     ['results.caught', data.caught, 'icon-caught'],
     ['results.sneaked', data.sneaked, 'icon-sneaked'],
     ['results.gifts', data.giftsOpened, 'gift-box'],
@@ -56,7 +56,8 @@ export function openResults(scene, data) {
     const x0 = -w / 2 + 50 + col * 380;
     const y = top + 232 + row * 62;
     const img = scene.add.image(x0 + 22, y, icon);
-    img.setScale(icon === 'gift-box' ? 0.55 : 0.8);
+    const frame = scene.textures.getFrame(icon);
+    img.setScale(Math.min(0.85, 46 / Math.max(frame.width, frame.height)));
     card.add(img);
     card.add(addText(scene, x0 + 54, y, label, { fontFamily: FONT, fontSize: '26px', fontStyle: '600', color: CSS.indigo }).setOrigin(0, 0.5));
     card.add(scene.add.text(x0 + 330, y, String(value), { fontFamily: FONT, fontSize: '38px', fontStyle: '700', color: CSS.red, resolution: 2 }).setOrigin(1, 0.5));
@@ -77,11 +78,18 @@ export function openResults(scene, data) {
   // buttons
   const by = h / 2 - 66;
   const retry = new Button(scene, -270, by, 'results.retry', data.onRetry, { width: 240, height: 70, fontSize: 28 });
-  const next = new Button(scene, 0, by, () => t('results.next', { name: t(data.nextNameKey) }), () => {}, { width: 300, height: 70, fontSize: 22, style: 'locked' });
-  next.enabled = false;
+  // "Next level": locked (grey) until the next level exists / is unlocked
+  const locked = data.nextLocked !== false;
+  const next = new Button(scene, 0, by, () => t('results.next', { name: t(data.nextNameKey) }), data.onNext || (() => {}), {
+    width: 300,
+    height: 70,
+    fontSize: 22,
+    style: locked ? 'locked' : 'red',
+  });
+  next.enabled = !locked;
   const menu = new Button(scene, 270, by, 'results.menu', data.onMenu, { width: 200, height: 70, fontSize: 28, style: 'indigo' });
-  const lock = scene.add.image(-122, by - 4, 'icon-lock').setScale(0.7);
-  const soon = addText(scene, 0, by + 44, 'results.locked', { fontFamily: FONT, fontSize: '18px', fontStyle: '600', color: '#8A7A6A' }).setOrigin(0.5);
+  const lock = scene.add.image(-122, by - 4, 'icon-lock').setScale(0.7).setVisible(locked);
+  const soon = addText(scene, 0, by + 44, 'results.locked', { fontFamily: FONT, fontSize: '18px', fontStyle: '600', color: '#8A7A6A' }).setOrigin(0.5).setVisible(locked);
   card.add([retry, next, menu, lock, soon]);
 
   card.setScale(0.6).setAlpha(0);

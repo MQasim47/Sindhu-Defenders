@@ -17,6 +17,7 @@ const WANTED = {
   'title-bg': 'assets/backgrounds/title-bg',
   'courtyard-bg': 'assets/backgrounds/courtyard-bg',
   'dodo-full-raw': 'assets/characters/dodo-full',
+  'amri-gate-bg': 'assets/backgrounds/amri-gate-bg', // optional: the picture for Level 2
   'emblem-png': 'assets/ui/emblem', // optional: replaces the emblem drawn in code
 };
 
