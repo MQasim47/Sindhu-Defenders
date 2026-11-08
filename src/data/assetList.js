@@ -18,6 +18,8 @@ const WANTED = {
   'courtyard-bg': 'assets/backgrounds/courtyard-bg',
   'dodo-full-raw': 'assets/characters/dodo-full',
   'amri-gate-bg': 'assets/backgrounds/amri-gate-bg', // optional: the picture for Level 2
+  'miri-fort-bg': 'assets/backgrounds/miri-fort-bg', // optional: the boss arena picture
+  'ranikot-map': 'assets/backgrounds/ranikot-map', // optional: the World Map picture
   'emblem-png': 'assets/ui/emblem', // optional: replaces the emblem drawn in code
 };
 
@@ -27,8 +29,13 @@ Object.entries(WANTED).forEach(([key, base]) => {
   if (file) IMAGES[key] = file;
 });
 
-// Sound slots. Add real files here when they exist, e.g.
-//   'sfx-jump': 'assets/audio/jump.ogg'
+// Sound slots. Add real files here when they exist, e.g.  'sfx-jump': 'assets/audio/jump.ogg'
+// Slots used by the game (nothing plays until a file is added): sfx-click sfx-jump sfx-land sfx-hit sfx-coin sfx-win
+//   sfx-lantern sfx-brick-pick sfx-brick-place sfx-chain-lock sfx-scroll-restore sfx-ball-hum sfx-jadugar-laugh
+//   Level 2 backup: sfx-backup-hold sfx-backup-done
+//   World Map: sfx-map-step sfx-map-locked
+//   Boss: sfx-round sfx-fight sfx-ko sfx-teleport sfx-beam-hit sfx-shield sfx-letter-land sfx-shockwave sfx-gift-throw
+//         sfx-gift-pop sfx-bugs sfx-deepfake sfx-codeword-lock sfx-key-right sfx-key-wrong sfx-confetti sfx-combo
 export const AUDIO = {};
 
 // Optional Urdu font (Noto Nastaliq Urdu). If it is not there, a system Urdu font is used.

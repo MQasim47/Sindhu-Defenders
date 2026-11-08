@@ -51,6 +51,14 @@ export default class HackerBrain {
 
   // ---------- Remembering ----------
 
+  // Starts from the counts of an earlier level of the same run (see runMemory.js).
+  loadStats(saved = {}) {
+    Object.keys(this.stats).forEach((name) => {
+      const old = saved[name];
+      if (old) this.stats[name] = { faced: old.faced || 0, fails: old.fails || 0 };
+    });
+  }
+
   // A threat was sent. attack = 'phishing' or 'trojan' (disguise only for phishing).
   recordSent(attack, disguise) {
     this.stats[attack].faced++;

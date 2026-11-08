@@ -12,13 +12,13 @@ export function isLevelOpen(id) {
   return i <= 0 || getStars(LEVEL_ORDER[i - 1]) >= 1;
 }
 
-// A simple level chooser (until the World Map exists): one card per level with its stars.
+// A simple level chooser (the fallback when the World Map cannot open): one card per level with its stars.
 // onPick(sceneKey) is called when an open level is chosen.
 export function openLevelSelect(scene, onPick) {
   const depth = 500;
   const blocker = scene.add.rectangle(640, 360, 1280, 720, 0x0b0d1a, 0.7).setInteractive().setDepth(depth);
   const card = scene.add.container(640, 360).setDepth(depth + 1);
-  const w = 820;
+  const w = 980;
   const h = 600;
 
   const g = scene.add.graphics();
@@ -38,8 +38,8 @@ export function openLevelSelect(scene, onPick) {
   LEVEL_ORDER.forEach((id, i) => {
     const level = LEVELS[id];
     const open = isLevelOpen(id);
-    const x = (i - (LEVEL_ORDER.length - 1) / 2) * 370;
-    const c = scene.add.container(x, 12);
+    const x = (i - (LEVEL_ORDER.length - 1) / 2) * 310;
+    const c = scene.add.container(x, 12).setScale(0.92);
 
     const bg = scene.add.graphics();
     bg.fillStyle(0x000000, 0.3);
@@ -70,8 +70,8 @@ export function openLevelSelect(scene, onPick) {
     c.setSize(320, 330);
     if (open) {
       c.setInteractive({ useHandCursor: true });
-      c.on('pointerover', () => scene.tweens.add({ targets: c, scale: 1.05, duration: 120, ease: 'Back.Out' }));
-      c.on('pointerout', () => scene.tweens.add({ targets: c, scale: 1, duration: 120 }));
+      c.on('pointerover', () => scene.tweens.add({ targets: c, scale: 0.97, duration: 120, ease: 'Back.Out' }));
+      c.on('pointerout', () => scene.tweens.add({ targets: c, scale: 0.92, duration: 120 }));
       c.on('pointerup', () => {
         playSfx(scene, 'sfx-click');
         onPick(level.sceneKey);

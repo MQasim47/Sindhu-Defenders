@@ -9,6 +9,7 @@ import Atmosphere from '../level/Atmosphere.js';
 import WaveSpawner from '../systems/WaveSpawner.js';
 import LevelDirector from '../systems/LevelDirector.js';
 import HackerBrain from '../ai/HackerBrain.js';
+import { resetRun, saveBrain } from '../ai/runMemory.js';
 import SpeechBubble from '../ui/SpeechBubble.js';
 import KeyHint from '../ui/KeyHint.js';
 import { buildCourtyardArt } from '../level/CourtyardArt.js';
@@ -64,6 +65,7 @@ export default class LevelScene extends Phaser.Scene {
 
     // the AI Hacker: his brain, and the wizard who stands on the wall
     this.brain = new HackerBrain();
+    resetRun(); // Level 1 starts a new run: the AI forgets the old one
     this.buildJadugar();
     this.buildGateSwirls();
 
@@ -253,6 +255,7 @@ export default class LevelScene extends Phaser.Scene {
   finishLevel() {
     const stars = this.computeStars();
     const tally = saveResult(this.levelData.id, stars);
+    saveBrain(this.brain);
     saveSnapshot(this.game, this);
     this.hud('showResults', {
       stars,

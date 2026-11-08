@@ -1,88 +1,46 @@
 import { FAQ, NOT_SURE } from '../data/projectKnowledge.js';
+import { buildIndex, tokenize } from './retriever.js';
+import { findChunks, firstSentences } from './knowledgeSearch.js';
 import { describeLearning } from './chatContext.js';
 
 // Engine B of Mithu: an offline question finder. No internet and no AI model needed.
-//
-// How it works (TF-IDF + cosine similarity):
-//   1. Every question/answer pair of the FAQ becomes a "document" made of words.
-//   2. A word that appears in only a few documents is important (high IDF). A word that
-//      appears in many (like "game") is less important.
-//   3. Your question becomes a list of numbers too (a vector).
-//   4. The pair whose numbers point in the most similar direction (cosine) wins.
-//   5. If even the best one is not similar enough, Mithu says what he can talk about.
+//   1. The FAQ pairs are matched with TF-IDF + cosine similarity (see retriever.js).
+//      All the ways to ask a question count double, the answer words count once.
+//   2. If the best pair is not similar enough, the best knowledge chunk answers (its first 3 sentences).
+//   3. If even that is weak, Mithu says what he can talk about.
+const FAQ_THRESHOLD = 0.3;
+const CHUNK_THRESHOLD = 0.1;
 
-const STOP = new Set(
-  'a an the is are was were be do does did i you me my we our your it its this that these those of to in on at for with and or but how what who why where when which can could would should will shall about tell explain please mean means into from as by if so than then there here have has had not no yes any some more most very just also'.split(' '),
+// every way to ask a question, written as plain words: a question that is exactly one of them wins at once
+const exact = new Map();
+FAQ.forEach((entry) => entry.q.forEach((q) => exact.set(tokenize(q).join(' '), entry)));
+
+const index = buildIndex(
+  FAQ.map((entry) => {
+    const q = tokenize(entry.q.join(' '));
+    return { item: entry, words: [...q, ...q, ...tokenize(entry.a)] };
+  }),
 );
-const MATCH_THRESHOLD = 0.2;
 
-// words in lower case, small words removed, a plural "s" removed
-export function tokenize(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .split(/[\s-]+/)
-    .filter((w) => w && !STOP.has(w))
-    .map((w) => (w.length > 4 && w.endsWith('s') ? w.slice(0, -1) : w));
-}
-
-function countWords(words) {
-  const counts = new Map();
-  words.forEach((w) => counts.set(w, (counts.get(w) || 0) + 1));
-  return counts;
-}
-
-// ---- build the index once ----
-const docs = FAQ.map((entry) => {
-  // question words count double, answer words count once
-  const words = [...tokenize(entry.q.join(' ')), ...tokenize(entry.q.join(' ')), ...tokenize(entry.a)];
-  return { entry, tf: countWords(words) };
-});
-const docFrequency = new Map();
-docs.forEach((d) => d.tf.forEach((_, w) => docFrequency.set(w, (docFrequency.get(w) || 0) + 1)));
-const idf = (w) => Math.log((docs.length + 1) / ((docFrequency.get(w) || 0) + 1)) + 1;
-
-function vectorize(tf) {
-  const vec = new Map();
-  let norm = 0;
-  tf.forEach((count, w) => {
-    const v = (1 + Math.log(count)) * idf(w);
-    vec.set(w, v);
-    norm += v * v;
-  });
-  return { vec, norm: Math.sqrt(norm) || 1 };
-}
-docs.forEach((d) => Object.assign(d, vectorize(d.tf)));
-
-function cosine(a, b) {
-  let dot = 0;
-  a.vec.forEach((v, w) => {
-    const other = b.vec.get(w);
-    if (other) dot += v * other;
-  });
-  return dot / (a.norm * b.norm);
-}
-
-// Returns { text, matched }. snapshot = live game data (for "what has the AI learned").
+// Returns { text, matched, source: 'live' | 'faq' | 'chunk' | 'none', score }.
+// snapshot = live game data (for "what has the AI learned about me").
 export function answerFromFaq(question, snapshot) {
   const q = question.toLowerCase();
 
   // questions about the player's own game use the real numbers
   if (/(learned|learnt|knows?|found).*\b(me|my|dodo)\b|\bmy (weakness|score|stats|mistakes)\b|how am i doing|what is my weakness/.test(q)) {
-    return { text: describeLearning(snapshot), matched: true };
+    return { text: describeLearning(snapshot), matched: true, source: 'live', score: 1 };
   }
 
-  const query = vectorize(countWords(tokenize(question)));
-  if (!query.vec.size) return { text: NOT_SURE, matched: false };
-  let best = null;
-  let bestScore = 0;
-  docs.forEach((d) => {
-    const score = cosine(query, d);
-    if (score > bestScore) {
-      bestScore = score;
-      best = d;
-    }
-  });
-  if (best && bestScore >= MATCH_THRESHOLD) return { text: best.entry.a, matched: true };
-  return { text: NOT_SURE, matched: false };
+  const same = exact.get(tokenize(question).join(' '));
+  if (same) return { text: same.a, matched: true, source: 'faq', score: 1 };
+
+  const best = index.search(question, 1)[0];
+  if (best && best.score >= FAQ_THRESHOLD) return { text: best.item.a, matched: true, source: 'faq', score: best.score };
+
+  const chunk = findChunks(question, 1)[0];
+  if (chunk && chunk.score >= CHUNK_THRESHOLD) {
+    return { text: firstSentences(chunk.item.text, 3), matched: true, source: 'chunk', score: chunk.score };
+  }
+  return { text: NOT_SURE, matched: false, source: 'none', score: best ? best.score : 0 };
 }

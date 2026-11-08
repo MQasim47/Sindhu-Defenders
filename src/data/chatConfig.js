@@ -10,5 +10,7 @@ export const OLLAMA_MODEL = 'qwen2.5:1.5b';
 export const OLLAMA_URL = '/ollama';
 export const OLLAMA_CHECK_MS = 2000; // Ollama must answer a quick "are you there?" within 2 seconds
 export const OLLAMA_FIRST_TOKEN_MS = 40000; // the first run can be slow while the model loads
+export const OLLAMA_TEMPERATURE = 0.3; // low = careful answers that stay with the knowledge
+export const OLLAMA_NUM_CTX = 4096; // how much text the model can read at once (tokens)
 export const MAX_MESSAGES = 20; // the chat remembers this many messages (in memory only)
 export const HISTORY_FOR_MODEL = 8; // how many of them are sent to the model

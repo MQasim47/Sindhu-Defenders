@@ -2,10 +2,11 @@ import Phaser from 'phaser';
 import BootScene from './scenes/BootScene.js';
 import PreloadScene from './scenes/PreloadScene.js';
 import MenuScene from './scenes/MenuScene.js';
-import CharacterSelectScene from './scenes/CharacterSelectScene.js';
 import WorldMapScene from './scenes/WorldMapScene.js';
 import LevelScene from './scenes/LevelScene.js';
 import Level2Scene from './scenes/Level2Scene.js';
+import BossScene from './scenes/BossScene.js';
+import BossUIScene from './scenes/BossUIScene.js';
 import UIScene from './scenes/UIScene.js';
 import ReportScene from './scenes/ReportScene.js';
 import { setupFpsMeter } from './ui/FpsMeter.js';
@@ -23,6 +24,7 @@ const config = {
   backgroundColor: '#0b0d1a',
   pixelArt: false,
   antialias: true,
+  dom: { createContainer: true }, // for the name box of the certificate
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -31,11 +33,12 @@ const config = {
     BootScene,
     PreloadScene,
     MenuScene,
-    CharacterSelectScene,
     WorldMapScene,
     LevelScene,
     Level2Scene,
+    BossScene,
     UIScene,
+    BossUIScene,
     ReportScene,
   ],
 };

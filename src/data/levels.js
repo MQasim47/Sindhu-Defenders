@@ -91,7 +91,16 @@ export const LEVELS = {
       },
     ],
   },
+
+  // ---------- Boss: Miri Fort (deepfake). The fight itself is in src/scenes/BossScene.js ----------
+  miri: {
+    id: 'miri',
+    sceneKey: 'Boss',
+    nameKey: 'level.miri',
+    nextId: null,
+    nextNameKey: 'level.miri',
+  },
 };
 
 export const FIRST_LEVEL = 'sann';
-export const LEVEL_ORDER = ['sann', 'amri'];
+export const LEVEL_ORDER = ['sann', 'amri', 'miri'];

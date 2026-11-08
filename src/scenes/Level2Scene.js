@@ -11,7 +11,8 @@ import GroundFx from '../fx/GroundFx.js';
 import Atmosphere from '../level/Atmosphere.js';
 import AmriSpawner from '../systems/AmriSpawner.js';
 import LevelDirector from '../systems/LevelDirector.js';
-import HackerBrain, { WALLS, BUILDINGS } from '../ai/HackerBrain.js';
+import HackerBrain, { WALLS } from '../ai/HackerBrain.js';
+import { loadRun, saveBrain } from '../ai/runMemory.js';
 import { ratePassword } from '../ai/passwordAI.js';
 import SpeechBubble from '../ui/SpeechBubble.js';
 import KeyHint from '../ui/KeyHint.js';
@@ -32,10 +33,11 @@ const EVENTS = [
   'building-locked', 'building-unlocked', 'no-backup', 'level-end',
 ];
 const FOLLOW_OFFSET_Y = 70;
-const PICK_SCROLL = 92;
+const BACKUP_SECONDS = 1; // hold E this long to back a building up
 
 // Level 2: Amri Gate. Hathoda Dev hammers the wall sections, Taala Bhoot locks the buildings.
-// Dodo builds strong passwords with bricks (zxcvbn rates them) and stores Backup Scrolls in the Kutubkhana.
+// Dodo builds strong passwords with bricks (zxcvbn rates them) and backs buildings up (hold E near one:
+// a scroll flies by itself to the Kutubkhana shelf).
 //
 //      gate (Hathoda and the ghosts come in here)
 //   ========= wall: LEFT | CENTER | RIGHT (each with a password plaque) =========
@@ -80,15 +82,16 @@ export default class Level2Scene extends Phaser.Scene {
     this.mithu = new Mithu(this, this.player);
     this.bubble = new SpeechBubble(this);
     this.eHint = new KeyHint(this, 'E');
+    this.backupHold = { building: null, t: 0 };
     this.carry = new CarryStack(this, this.player);
 
     this.bricks = new BrickSystem(this, { ...yard, colliders });
-    this.buildScrolls();
     this.buildFliers();
     this.buildShockRings();
 
     // the AI Hacker
     this.brain = new HackerBrain();
+    this.brain.loadStats(loadRun().stats); // the AI remembers Level 1
     this.buildJadugar();
     this.buildGateSwirls();
     const world = { colliders: buildingOnly(this.buildings), gate: art.gate, buildings: this.buildings };
@@ -157,39 +160,21 @@ export default class Level2Scene extends Phaser.Scene {
     this.shelfPoint = { x: this.shelf.x, y: this.shelf.y };
   }
 
-  // one Backup Scroll lies next to each building (during Tayyari)
-  buildScrolls() {
-    this.scrolls = this.buildings.map((bd) => {
-      const spot = bd.scrollSpot;
-      const image = this.add.image(spot.x, spot.y, 'backup-scroll').setOrigin(0.5, 1).setScale(1.3).setDepth(spot.y).setVisible(false);
-      const glow = this.add.image(spot.x, spot.y - 24, 'fx-glow').setTint(0xffe08a).setBlendMode(Phaser.BlendModes.ADD).setScale(0.8).setAlpha(0.5).setDepth(spot.y - 1).setVisible(false);
-      return { building: bd, image, glow, active: false, x: spot.x, y: spot.y, time: Math.random() * 6 };
-    });
-  }
-
-  showScrolls() {
-    this.scrolls.forEach((s, i) => {
-      if (s.building.backedUp) return;
-      s.active = true;
-      s.image.setVisible(true).setScale(0);
-      s.glow.setVisible(true);
-      this.tweens.add({ targets: s.image, scale: 1.3, duration: 420, delay: i * 160, ease: 'Back.Out' });
-    });
-  }
-
   // little pictures that fly (a brick to a wall, a scroll to the shelf or to a locked building)
   buildFliers() {
     this.fliers = [];
     for (let i = 0; i < 4; i++) this.fliers.push(this.add.image(0, 0, 'fx-print').setVisible(false).setDepth(95000).setOrigin(0.5, 1));
   }
 
-  flyer(texture, from, to, duration, onArrive, scale = 1) {
+  // trail = true leaves sparkles behind the flying picture
+  flyer(texture, from, to, duration, onArrive, scale = 1, trail = false) {
     const f = this.fliers.find((img) => !img.visible);
     if (!f) {
       onArrive();
       return;
     }
     f.setTexture(texture).setVisible(true).setScale(scale).setAngle(0);
+    let last = 0;
     this.tweens.addCounter({
       from: 0,
       to: 1,
@@ -197,8 +182,12 @@ export default class Level2Scene extends Phaser.Scene {
       ease: 'Sine.InOut',
       onUpdate: (tw) => {
         const p = tw.getValue();
-        f.setPosition(from.x + (to.x - from.x) * p, from.y + (to.y - from.y) * p - Math.sin(p * Math.PI) * 70);
-        f.setAngle(p * 360);
+        f.setPosition(from.x + (to.x - from.x) * p, from.y + (to.y - from.y) * p - Math.sin(p * Math.PI) * (trail ? 150 : 70));
+        f.setAngle(trail ? Math.sin(p * 12) * 14 : p * 360);
+        if (trail && p - last > 0.07) {
+          last = p;
+          this.fx.sparkle(f.x, f.y);
+        }
       },
       onComplete: () => {
         f.setVisible(false);
@@ -265,11 +254,10 @@ export default class Level2Scene extends Phaser.Scene {
   // Tayyari: bricks to collect, scrolls to store
   playPrep() {
     this.prepping = true;
-    this.showScrolls();
     this.bricks.timer = 0.2;
     this.time.delayedCall(300, () => this.say('mithu.l2.prep1'));
     this.time.delayedCall(8500, () => this.say('mithu.l2.prep2'));
-    this.time.delayedCall(16500, () => this.say('mithu.l2.prep3'));
+    this.time.delayedCall(15500, () => this.say('mithu.l2.prep3'));
   }
 
   lookAtJadugar(on) {
@@ -363,6 +351,7 @@ export default class Level2Scene extends Phaser.Scene {
   finishLevel() {
     const stars = this.computeStars();
     const tally = saveResult(this.levelData.id, stars);
+    saveBrain(this.brain);
     saveSnapshot(this.game, this);
     const s = this.stats;
     this.hud('showResults', {
@@ -376,7 +365,8 @@ export default class Level2Scene extends Phaser.Scene {
       weakness: this.brain.biggestWeakness(),
       tally: { ...tally },
       nextNameKey: this.levelData.nextNameKey,
-      nextLocked: true,
+      nextLocked: false, // the boss opens with at least 1 star, and every finished level has one
+      nextSceneKey: 'Boss',
     });
   }
 
@@ -411,34 +401,28 @@ export default class Level2Scene extends Phaser.Scene {
 
   // ---------- Things Dodo can do with E ----------
 
-  // What can Dodo do right now? (the first one that fits is the answer)
+  // What can Dodo do right now? Only ONE answer, the first that fits, and the prompt shows exactly that:
+  //   1. wall section + carrying bricks -> place a brick
+  //   2. a brick on the ground          -> pick it up
+  //   3. a building without a backup    -> hold E to back it up
+  //   4. a locked building              -> unlock it
   findInteraction() {
     const p = this.player;
-    if (this.player.inputLocked) return null;
+    if (p.inputLocked) return null;
 
-    // unlock a locked building
-    for (const b of this.buildings) {
-      if (b.locked && !b.unlocking && b.isNear(p)) return { type: 'unlock', building: b, at: b.topPoint };
-    }
-    // store a scroll on the shelf
-    if (this.carry.scroll && Phaser.Math.Distance.Between(p.x, p.y, this.shelfPoint.x, this.shelfPoint.y) < 150) {
-      return { type: 'store', at: { x: this.shelfPoint.x, y: this.shelfPoint.y - 120 } };
-    }
-    // place a brick on a wall section
     if (this.carry.count > 0) {
       const s = this.sections.find((sec) => sec.isNear(p) && !sec.isFull);
-      if (s) return { type: 'place', section: s, at: { x: p.x, y: p.y - 250 } };
+      if (s) return { type: 'place', section: s, at: { x: p.x, y: p.y - 270 }, label: 'prompt.place' };
     }
-    // pick up a scroll
-    if (this.carry.canTakeScroll) {
-      const s = this.scrolls.find((sc) => sc.active && Phaser.Math.Distance.Between(p.x, p.y, sc.x, sc.y) < PICK_SCROLL);
-      if (s) return { type: 'scroll', scroll: s, at: { x: s.x, y: s.y - 70 } };
-    }
-    // pick up a brick
     if (this.carry.canTakeBrick) {
       const b = this.bricks.nearest(p);
-      if (b) return { type: 'brick', brick: b, at: { x: b.x, y: b.y - 70 } };
+      if (b) return { type: 'brick', brick: b, at: { x: b.x, y: b.y - 70 }, label: 'prompt.pick' };
     }
+    // a locked building cannot be backed up (its files are already locked): it must be unlocked
+    const toBackUp = this.buildings.find((b) => !b.backedUp && !b.locked && !b.backingUp && b.isNear(p));
+    if (toBackUp) return { type: 'backup', building: toBackUp, at: toBackUp.topPoint, label: 'prompt.backup' };
+    const toUnlock = this.buildings.find((b) => b.locked && !b.unlocking && b.isNear(p));
+    if (toUnlock) return { type: 'unlock', building: toUnlock, at: toUnlock.topPoint, label: 'prompt.unlock' };
     return null;
   }
 
@@ -448,17 +432,6 @@ export default class Level2Scene extends Phaser.Scene {
       case 'unlock':
         act.building.beginUnlock();
         break;
-      case 'store': {
-        const item = this.carry.popScroll();
-        playSfx(this, 'sfx-scroll-store');
-        this.flyer('backup-scroll', { x: item.x, y: item.y }, { x: this.shelfPoint.x, y: this.shelfPoint.y - 50 }, 520, () => {
-          item.building.setBackedUp();
-          this.tweens.add({ targets: this.shelfGlow, alpha: { from: 0.9, to: 0.25 }, duration: 800 });
-          this.fx.sparkle(this.shelfPoint.x, this.shelfPoint.y - 60);
-          this.sayOnce('stored', 'mithu.l2.stored');
-        });
-        break;
-      }
       case 'place': {
         const brick = this.carry.popBrick();
         if (!brick) break;
@@ -475,14 +448,6 @@ export default class Level2Scene extends Phaser.Scene {
         });
         break;
       }
-      case 'scroll': {
-        act.scroll.active = false;
-        act.scroll.image.setVisible(false);
-        act.scroll.glow.setVisible(false);
-        this.carry.pushScroll(act.scroll.building, act.scroll.x, act.scroll.y - 20);
-        playSfx(this, 'sfx-brick-pick');
-        break;
-      }
       case 'brick': {
         const ch = this.bricks.take(act.brick);
         this.carry.pushBrick(ch, act.brick.x, act.brick.y - 20);
@@ -491,6 +456,22 @@ export default class Level2Scene extends Phaser.Scene {
       default:
         break;
     }
+  }
+
+  // The backup is done: a scroll flies from the building to the Kutubkhana shelf (arc + sparkle trail).
+  // Dodo's hands stay free, he can walk away at once.
+  playBackup(building) {
+    building.backingUp = true;
+    playSfx(this, 'sfx-backup-done');
+    const from = { x: building.x, y: building.y - 150 };
+    const to = { x: this.shelfPoint.x, y: this.shelfPoint.y - 50 };
+    this.flyer('backup-scroll', from, to, 750, () => {
+      building.backingUp = false;
+      building.setBackedUp();
+      this.tweens.add({ targets: this.shelfGlow, alpha: { from: 1, to: 0.25 }, duration: 900 });
+      for (let i = 0; i < 4; i++) this.fx.sparkle(this.shelfPoint.x + (Math.random() - 0.5) * 80, this.shelfPoint.y - 40 - Math.random() * 70);
+      this.sayOnce('stored', 'mithu.l2.stored');
+    }, 1.4, true);
   }
 
   // scroll magic: the backup flies from the shelf to the locked building and the chains shatter
@@ -522,29 +503,19 @@ export default class Level2Scene extends Phaser.Scene {
     this.spawner.update(dt);
     this.director.update(dt);
     this.carry.update(dt);
-    this.updateScrolls(dt);
     this.updateRings(dt);
     this.updateDrain(dt);
     this.mithu.update(dt);
     this.jadugar.update(dt);
     this.fx.update(dt);
     this.atmosphere.update(dt);
-    this.updateInteraction();
+    this.updateInteraction(dt);
 
     const s = this.toScreen(this.mithu.x, this.mithu.y - 52);
     this.bubble.follow(s.x, s.y);
     const pr = this.director.progress();
     this.hud('setPhase', pr.labelKey, pr.vars);
     this.hud('setTime', pr.elapsed, pr.total);
-  }
-
-  updateScrolls(dt) {
-    for (const s of this.scrolls) {
-      if (!s.active) continue;
-      s.time += dt;
-      s.image.y = s.y + Math.sin(s.time * 3) * 3;
-      s.glow.setAlpha(0.4 + Math.sin(s.time * 4) * 0.15);
-    }
   }
 
   // a locked building slowly costs coins
@@ -593,28 +564,56 @@ export default class Level2Scene extends Phaser.Scene {
     lost.chars.forEach((ch, i) => {
       this.bricks.place(ch, p.x + dir * (60 + i * 46), Phaser.Math.Clamp(p.y + 24 + i * 12, this.wallY + 80, this.art.bounds.maxY - 10), p.x, p.y - 140);
     });
-    if (lost.scroll) {
-      const sc = this.scrolls.find((s) => s.building === lost.scroll);
-      if (sc) {
-        sc.active = true;
-        sc.image.setVisible(true).setScale(1.3);
-        sc.glow.setVisible(true);
-      }
-    }
     this.sayOnce('shock', 'mithu.l2.shock');
   }
 
-  // E: show a sign, and do the action when the key is pressed
-  updateInteraction() {
-    const pressed = Phaser.Input.Keyboard.JustDown(this.player.keys.use);
+  // E: show ONE sign (the action that will happen) and do it when E is pressed.
+  // Backup is different: E must be HELD for BACKUP_SECONDS (a ring fills), then the scroll flies.
+  updateInteraction(dt) {
+    const key = this.player.keys.use;
+    const pressed = Phaser.Input.Keyboard.JustDown(key);
     const act = this.findInteraction();
-    if (act) {
-      this.eHint.show();
-      this.eHint.place(act.at.x, act.at.y);
-      if (pressed) this.doInteraction(act);
-    } else {
+    const hold = this.backupHold;
+
+    if (!act) {
+      this.cancelBackup();
       this.eHint.hide();
+      return;
     }
+    this.eHint.show();
+    this.eHint.place(act.at.x, act.at.y);
+    this.eHint.setAction(act.label);
+
+    if (act.type === 'backup') {
+      if (pressed) {
+        hold.building = act.building;
+        hold.t = 0;
+        playSfx(this, 'sfx-backup-hold');
+      }
+      if (hold.building === act.building && key.isDown) {
+        hold.t += dt;
+        const p = Math.min(1, hold.t / BACKUP_SECONDS);
+        act.building.setBackupProgress(p);
+        this.eHint.setProgress(p);
+        if (p >= 1) {
+          this.cancelBackup();
+          this.playBackup(act.building);
+        }
+      } else {
+        this.cancelBackup();
+      }
+      return;
+    }
+    this.cancelBackup();
+    if (pressed) this.doInteraction(act);
+  }
+
+  cancelBackup() {
+    const hold = this.backupHold;
+    if (hold.building) hold.building.setBackupProgress(0);
+    hold.building = null;
+    hold.t = 0;
+    this.eHint.setProgress(0);
   }
 
   showHint() {
@@ -644,4 +643,3 @@ function buildingOnly(buildings) {
   return buildings.map((b) => b.collider);
 }
 
-void BUILDINGS;

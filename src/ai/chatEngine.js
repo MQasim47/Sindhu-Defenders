@@ -1,5 +1,5 @@
-import { KNOWLEDGE_TEXT } from '../data/projectKnowledge.js';
-import { OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CHECK_MS, OLLAMA_FIRST_TOKEN_MS, HISTORY_FOR_MODEL } from '../data/chatConfig.js';
+import { findChunks, chunksToText } from './knowledgeSearch.js';
+import { OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CHECK_MS, OLLAMA_FIRST_TOKEN_MS, HISTORY_FOR_MODEL, OLLAMA_TEMPERATURE, OLLAMA_NUM_CTX } from '../data/chatConfig.js';
 import { contextToText } from './chatContext.js';
 import { answerFromFaq } from './faqBot.js';
 
@@ -8,13 +8,22 @@ import { answerFromFaq } from './faqBot.js';
 //   B) the offline question finder in faqBot.js
 // If Ollama is not reachable (or fails), B answers. The player never sees a raw error.
 
+// Kept short on purpose: a small model stays focused when the prompt is short.
 const PERSONA = `You are Mithu, a friendly green parrot guide in the game Sindhu Defenders.
-Rules:
-- Answer ONLY questions about this game, how it was built, cyber safety and AI basics.
-- Use simple English that a 12-year-old understands.
-- Use at most 3 short sentences.
-- If the question is about something else, politely bring the topic back to the game and cyber safety.
-- Never invent facts. Use only the KNOWLEDGE and the LIVE GAME DATA below. If you do not know, say so kindly.`;
+- Answer only about this project (game, story, levels, monsters, AI, tools) and cyber safety. For anything else, politely bring the talk back to the project.
+- Simple English for a 12-year-old. At most 6 short sentences.
+- Give real details (names, numbers, reasons) from the KNOWLEDGE below. Never invent facts. If it is not there, say you are not sure.
+- When useful, end with one short follow-up suggestion like "Want to know how the AI learns?".`;
+const MAX_SENTENCES = 6;
+const CHUNKS_FOR_MODEL = 4;
+
+// The question used to find knowledge. A very short follow-up ("why?") borrows the question before it.
+function retrievalQuery(history) {
+  const users = history.filter((m) => m.role === 'user').map((m) => m.text);
+  const last = users[users.length - 1] || '';
+  if (last.split(/\s+/).length < 4 && users.length > 1) return `${users[users.length - 2]} ${last}`;
+  return last;
+}
 
 let lastCheck = { time: 0, ok: false };
 
@@ -49,17 +58,19 @@ export function warmUp() {
   });
 }
 
-// keep the answer short: at most 3 sentences
+// keep the answer short: at most 6 sentences
 function shorten(text) {
   const sentences = text.trim().split(/(?<=[.!?])\s+/);
-  return sentences.slice(0, 3).join(' ');
+  return sentences.slice(0, MAX_SENTENCES).join(' ');
 }
 
 // Streams the answer from Ollama. onText(fullTextSoFar) is called while words arrive.
 async function askOllama(history, snapshot, onText, signal) {
+  // RAG: only the best chunks for THIS question go to the model, plus the live game data
+  const found = findChunks(retrievalQuery(history), CHUNKS_FOR_MODEL);
   const messages = [
-    { role: 'system', content: `${PERSONA}\n\nKNOWLEDGE:\n${KNOWLEDGE_TEXT}\n\n${contextToText(snapshot)}` },
-    ...history.slice(-HISTORY_FOR_MODEL).map((m) => ({ role: m.role, content: m.text })),
+    { role: 'system', content: `${PERSONA}\n\nKNOWLEDGE:\n${chunksToText(found)}\n\n${contextToText(snapshot)}` },
+    ...history.slice(-HISTORY_FOR_MODEL).map((m) => ({ role: m.role, content: m.text.slice(0, 600) })),
   ];
 
   const controller = new AbortController();
@@ -78,7 +89,7 @@ async function askOllama(history, snapshot, onText, signal) {
         messages,
         stream: true,
         keep_alive: '10m',
-        options: { temperature: 0.4, num_predict: 150 },
+        options: { temperature: OLLAMA_TEMPERATURE, num_ctx: OLLAMA_NUM_CTX, num_predict: 320 },
       }),
       signal: controller.signal,
     });

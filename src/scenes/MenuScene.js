@@ -27,6 +27,10 @@ export default class MenuScene extends Phaser.Scene {
     super('Menu');
   }
 
+  init(data) {
+    this.openLevelsAtStart = !!(data && data.openLevels); // the World Map could not open: show the Levels list
+  }
+
   create() {
     this.cameras.main.fadeIn(500, 11, 13, 26);
     this.time_ = 0;
@@ -41,6 +45,7 @@ export default class MenuScene extends Phaser.Scene {
     this.buildButtons();
     this.buildClickToStart();
     this.globe = makeGlobeButton(this, 1226, 52).setDepth(40);
+    if (this.openLevelsAtStart) this.time.delayedCall(600, () => this.showLevels());
   }
 
   update(time, delta) {
@@ -275,7 +280,7 @@ export default class MenuScene extends Phaser.Scene {
     });
   }
 
-  // choose a level (Sann Gate or Amri Gate)
+  // choose a level (the simple list, also the fallback of the World Map)
   showLevels() {
     openLevelSelect(this, (sceneKey) => this.startLevel(sceneKey));
   }
@@ -313,6 +318,7 @@ export default class MenuScene extends Phaser.Scene {
     this.leaving = true;
     playSfx(this, 'sfx-click');
     this.cameras.main.fadeOut(500, 11, 13, 26);
-    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('Level'));
+    // the World Map (it opens the Levels list by itself if the map cannot load)
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('WorldMap'));
   }
 }
