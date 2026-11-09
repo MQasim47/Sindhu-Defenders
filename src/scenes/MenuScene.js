@@ -1,8 +1,17 @@
 import Phaser from 'phaser';
 import Button from '../ui/Button.js';
 import { createLogoTitle, createRibbon } from '../ui/LogoText.js';
-import { openPanel } from '../ui/Panel.js';
 import { openLevelSelect } from '../ui/LevelSelect.js';
+import { openHowTo } from '../ui/HowToPlay.js';
+import { openSettings } from '../ui/SettingsPanel.js';
+import { openCredits } from '../ui/Credits.js';
+import AttractMode from '../ui/AttractMode.js';
+import { progress } from '../data/progress.js';
+import { goToScene } from '../systems/sceneFlow.js';
+import { audio } from '../audio/AudioManager.js';
+import { groupFiles } from '../data/assetList.js';
+import { ensureLateTextures } from '../objects/placeholderTextures.js';
+import { mark } from '../systems/perfWatch.js';
 import { openChat } from '../ui/chat/ChatPanel.js';
 import { t } from '../i18n/index.js';
 import Player from '../objects/Player.js';
@@ -12,6 +21,8 @@ import { settings } from '../data/settings.js';
 import { CSS, FONT_TITLE } from '../data/colors.js';
 import { addText } from '../i18n/i18nText.js';
 import { makeGlobeButton } from '../ui/LanguageMenu.js';
+
+const IDLE_MS = 60000; // 60 seconds without anyone: attract mode
 
 // Where Dodo's eyes are in the original dodo-full picture (full size pixels).
 const EYES = [
@@ -44,6 +55,13 @@ export default class MenuScene extends Phaser.Scene {
     this.buildTitle();
     this.buildButtons();
     this.buildClickToStart();
+    window.__titleShownAt = performance.now(); // for the cold start test (time since the page started)
+    mark('title built');
+    this.time.delayedCall(250, () => ensureLateTextures(this)); // the art of the levels, made while the player looks at the title
+    this.buildScoreboard();
+    audio.loadAndPlay(this, 'music-menu', groupFiles('menuMusic')); // loaded after the title is shown
+    this.watchIdle();
+    this.setupKeyboardFocus();
     this.globe = makeGlobeButton(this, 1226, 52).setDepth(40);
     if (this.openLevelsAtStart) this.time.delayedCall(600, () => this.showLevels());
   }
@@ -51,6 +69,8 @@ export default class MenuScene extends Phaser.Scene {
   update(time, delta) {
     const dt = Math.min(delta, 50) / 1000;
     this.time_ += dt;
+    if (this.attract) this.attract.update(dt);
+    else if (!this.leaving && time - this.lastTouch > IDLE_MS) this.startAttract();
     const t = this.time_;
     if (this.lidSync) this.lidSync();
     for (const bird of this.birds) {
@@ -251,7 +271,8 @@ export default class MenuScene extends Phaser.Scene {
       { label: 'menu.levels', x, y: 430, opts: { width: 330, height: 66, fontSize: 30, style: 'indigo' }, action: () => this.showLevels() },
       { label: 'menu.howTo', x: x - 85, y: 518, opts: { width: 165, height: 62, fontSize: 22, style: 'indigo' }, action: () => this.showHowTo() },
       { label: 'menu.settings', x: x + 85, y: 518, opts: { width: 165, height: 62, fontSize: 22, style: 'indigo' }, action: () => this.showSettings() },
-      { label: 'menu.askMithu', x, y: 604, opts: { width: 330, height: 66, fontSize: 28, style: 'indigo' }, action: () => this.askMithu() },
+      { label: 'menu.askMithu', x: x - 70, y: 604, opts: { width: 215, height: 62, fontSize: 24, style: 'indigo' }, action: () => this.askMithu() },
+      { label: 'menu.credits', x: x + 100, y: 604, opts: { width: 125, height: 62, fontSize: 21, style: 'indigo' }, action: () => openCredits(this) },
     ];
     this.buttons = defs.map((d, i) => {
       const button = new Button(this, d.x, d.y, d.label, d.action, d.opts).setDepth(20);
@@ -290,7 +311,7 @@ export default class MenuScene extends Phaser.Scene {
     this.leaving = true;
     playSfx(this, 'sfx-click');
     this.cameras.main.fadeOut(500, 11, 13, 26);
-    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start(sceneKey));
+    this.cameras.main.once('camerafadeoutcomplete', () => goToScene(this, sceneKey));
   }
 
   // the chat with Mithu (the last game, if there was one, gives him real numbers to talk about)
@@ -299,17 +320,68 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   showHowTo() {
-    openPanel(this, { titleKey: 'howto.title', lineKeys: ['howto.line1', 'howto.line2', 'howto.line3', 'howto.line4', 'howto.line5'] });
+    openHowTo(this);
   }
 
   showSettings() {
-    openPanel(this, {
-      titleKey: 'settings.title',
-      language: true,
-      toggles: [
-        { labelKey: 'settings.low', key: 'low' },
-        { labelKey: 'settings.reduced', key: 'reduced' },
-      ],
+    openSettings(this);
+  }
+
+  // the big Humans vs AI Hacker score (top left)
+  buildScoreboard() {
+    const c = this.add.container(132, 70).setDepth(25);
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.4);
+    g.fillRoundedRect(-112, -48, 224, 108, 24);
+    g.fillStyle(0x5a0f1d, 1);
+    g.fillRoundedRect(-116, -52, 232, 108, 26);
+    g.fillStyle(0x1c2457, 0.96);
+    g.fillRoundedRect(-110, -46, 220, 96, 22);
+    g.lineStyle(3, 0xe8b84a, 1);
+    g.strokeRoundedRect(-104, -40, 208, 84, 18);
+    c.add(g);
+    c.add(addText(this, 0, -22, 'scoreboard.title', { fontFamily: FONT_TITLE, fontSize: '19px', fontStyle: '700', color: CSS.gold }).setOrigin(0.5));
+    const num = { fontFamily: FONT_TITLE, fontSize: '46px', fontStyle: '700', color: CSS.cream, stroke: '#10143a', strokeThickness: 7, resolution: 2 };
+    c.add(this.add.text(-52, 18, String(progress.tally.human), { ...num, color: '#7CFC9A' }).setOrigin(0.5));
+    c.add(this.add.text(0, 18, ':', num).setOrigin(0.5));
+    c.add(this.add.text(52, 18, String(progress.tally.ai), { ...num, color: '#FF8A7A' }).setOrigin(0.5));
+  }
+
+  // Keyboard: arrow keys move a gold focus ring over the buttons, Enter or Space presses the focused one.
+  setupKeyboardFocus() {
+    this.focusIndex = -1;
+    const move = (d) => {
+      if (this.modalOpen || this.attract || this.leaving) return;
+      this.focusIndex = (this.focusIndex + d + this.buttons.length) % this.buttons.length;
+      this.buttons.forEach((b, i) => b.setFocused(i === this.focusIndex));
+    };
+    const kb = this.input.keyboard;
+    kb.on('keydown-DOWN', () => move(1));
+    kb.on('keydown-RIGHT', () => move(1));
+    kb.on('keydown-UP', () => move(-1));
+    kb.on('keydown-LEFT', () => move(-1));
+    const press = () => {
+      if (this.modalOpen || this.attract || this.leaving) return;
+      const b = this.buttons[this.focusIndex >= 0 ? this.focusIndex : 0];
+      if (b) b.press();
+    };
+    kb.on('keydown-ENTER', press);
+    kb.on('keydown-SPACE', press);
+  }
+
+  // any touch resets the idle timer (for attract mode)
+  watchIdle() {
+    this.lastTouch = this.time.now;
+    const touch = () => (this.lastTouch = this.time.now);
+    this.input.on('pointermove', touch);
+    this.input.on('pointerdown', touch);
+    this.input.keyboard.on('keydown', touch);
+  }
+
+  startAttract() {
+    this.attract = new AttractMode(this, () => {
+      this.attract = null;
+      this.lastTouch = this.time.now;
     });
   }
 
@@ -319,6 +391,6 @@ export default class MenuScene extends Phaser.Scene {
     playSfx(this, 'sfx-click');
     this.cameras.main.fadeOut(500, 11, 13, 26);
     // the World Map (it opens the Levels list by itself if the map cannot load)
-    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('WorldMap'));
+    this.cameras.main.once('camerafadeoutcomplete', () => goToScene(this, 'WorldMap'));
   }
 }

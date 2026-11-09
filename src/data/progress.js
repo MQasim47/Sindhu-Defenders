@@ -35,3 +35,9 @@ export function saveResult(levelId, stars) {
   save();
   return data.tally;
 }
+
+// A new visitor (exhibition): the stars are cleared, the Humans vs AI Hacker tally is kept.
+export function resetProgress() {
+  data.stars = {};
+  save();
+}

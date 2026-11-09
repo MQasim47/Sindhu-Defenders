@@ -1,3 +1,4 @@
+import { ensureLateTextures } from '../objects/placeholderTextures.js';
 import Phaser from 'phaser';
 import Button from '../ui/Button.js';
 import { COLORS, CSS, FONT } from '../data/colors.js';
@@ -7,6 +8,7 @@ import PauseMenu from '../ui/PauseMenu.js';
 import { openResults } from '../ui/ResultsCard.js';
 import { t } from '../i18n/index.js';
 import { playSfx } from '../fx/sound.js';
+import { goToScene } from '../systems/sceneFlow.js';
 import { makeCanvasTexture, roundRectPath } from '../fx/canvasUtil.js';
 
 const COIN_POOL = 16;
@@ -28,6 +30,7 @@ export default class UIScene extends Phaser.Scene {
   }
 
   create() {
+    ensureLateTextures(this);
     this.coins = this.config.startCoins;
     this.caught = 0;
     this.sneaked = 0;
@@ -314,7 +317,7 @@ export default class UIScene extends Phaser.Scene {
     level.cameras.main.fadeOut(400, 11, 13, 26);
     level.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.stop();
-      level.scene.start(sceneKey);
+      goToScene(level, sceneKey);
     });
   }
 

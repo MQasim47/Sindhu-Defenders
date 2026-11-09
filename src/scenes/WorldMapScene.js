@@ -1,3 +1,4 @@
+import { ensureLateTextures } from '../objects/placeholderTextures.js';
 import Phaser from 'phaser';
 import Button from '../ui/Button.js';
 import { isLevelOpen } from '../ui/LevelSelect.js';
@@ -8,29 +9,25 @@ import { makeCanvasTexture } from '../fx/canvasUtil.js';
 import { addText, setSource } from '../i18n/i18nText.js';
 import { t } from '../i18n/index.js';
 import { playSfx } from '../fx/sound.js';
+import { goToScene } from '../systems/sceneFlow.js';
+import { audio } from '../audio/AudioManager.js';
 
 // Where things are on the map picture, as fractions of the picture (0..1).
 // If you paint a new map, only these numbers need to change.
 const NODES = {
-  sann: { x: 0.235, y: 0.735, level: true },
-  amri: { x: 0.805, y: 0.753, level: true },
-  miri: { x: 0.375, y: 0.35, level: true },
-  shah: { x: 0.47, y: 0.184, level: false }, // Shah-Pere Gate: coming soon
-  mohan: { x: 0.2175, y: 0.215, level: false }, // Mohan Gate: coming soon
+  sann: { x: 0.235, y: 0.735 },
+  amri: { x: 0.805, y: 0.753 },
+  miri: { x: 0.375, y: 0.35 },
 };
 // the paths between the nodes (a few points each, they are smoothed)
 const PATHS = [
   ['sann', 'amri', [[0.31, 0.68], [0.42, 0.7], [0.52, 0.66], [0.62, 0.7], [0.72, 0.72]]],
   ['amri', 'miri', [[0.74, 0.6], [0.66, 0.5], [0.56, 0.43], [0.46, 0.4]]],
-  ['miri', 'shah', [[0.4, 0.27], [0.44, 0.22]]],
-  ['miri', 'mohan', [[0.3, 0.28], [0.25, 0.24]]],
 ];
 const ICONS = {
   sann: ['behroopia-blob', 'trojan-horse'],
   amri: ['hathoda-body', 'taala-ghost'],
   miri: ['jadugar-head'],
-  shah: [],
-  mohan: [],
 };
 const WALK_SPEED = 360; // pixels per second
 const DODO_SIDE = 56; // Dodo stands next to a node, so its stars stay visible
@@ -53,8 +50,10 @@ export default class WorldMapScene extends Phaser.Scene {
   }
 
   build() {
+    ensureLateTextures(this);
     this.cameras.main.fadeIn(500, 11, 13, 26);
     this.leaving = false;
+    audio.playMusic('music-menu');
     this.hover = null;
     this.walk = null;
     this.queue = [];
@@ -193,8 +192,7 @@ export default class WorldMapScene extends Phaser.Scene {
       this.edges[`${b}>${a}`] = [...pts].reverse();
       (this.neighbours[a] = this.neighbours[a] || []).push(b);
       (this.neighbours[b] = this.neighbours[b] || []).push(a);
-      const soon = !NODES[a].level || !NODES[b].level;
-      // a dotted gold line with a dark edge (grey when the way leads to a "coming soon" gate)
+      // a dotted gold line with a dark edge
       let carry = 0;
       for (let i = 1; i < pts.length; i++) {
         const dx = pts[i].x - pts[i - 1].x;
@@ -204,7 +202,7 @@ export default class WorldMapScene extends Phaser.Scene {
         carry = 0;
         g.fillStyle(0x2a0e14, 0.85);
         g.fillCircle(pts[i].x, pts[i].y, 7.5);
-        g.fillStyle(soon ? 0xb8b0c0 : 0xffd24a, 1);
+        g.fillStyle(0xffd24a, 1);
         g.fillCircle(pts[i].x, pts[i].y, 5);
       }
     });
@@ -216,7 +214,7 @@ export default class WorldMapScene extends Phaser.Scene {
     this.nodes = {};
     Object.entries(NODES).forEach(([id, n]) => {
       const p = this.pos[id];
-      const open = n.level && isLevelOpen(id);
+      const open = isLevelOpen(id);
       const c = this.add.container(p.x, p.y).setDepth(5);
       const g = this.add.graphics();
       // a round medallion with a gold ring and an Ajrak-red / indigo / grey middle
@@ -230,10 +228,9 @@ export default class WorldMapScene extends Phaser.Scene {
       g.strokeCircle(0, 0, 34);
       c.add(g);
       // number / boss hat / lock
-      if (!n.level) c.add(this.add.image(0, 0, 'icon-lock').setScale(0.8));
-      else if (id === 'miri') c.add(this.add.image(0, 2, 'jadugar-hat').setScale(0.75));
+      if (id === 'miri') c.add(this.add.image(0, 2, 'jadugar-hat').setScale(0.75));
       else c.add(this.add.text(0, -2, id === 'sann' ? '1' : '2', { fontFamily: FONT, fontSize: '40px', fontStyle: '700', color: CSS.cream, resolution: 2 }).setOrigin(0.5));
-      if (n.level && !open) c.add(this.add.image(24, 24, 'icon-lock').setScale(0.55));
+      if (!open) c.add(this.add.image(24, 24, 'icon-lock').setScale(0.55));
       c.setSize(90, 90);
       c.setInteractive({ useHandCursor: true });
       c.on('pointerover', () => this.setHover(id));
@@ -241,12 +238,12 @@ export default class WorldMapScene extends Phaser.Scene {
       c.on('pointerup', () => this.clickNode(id));
 
       // name and stars under the node
-      addText(this, p.x, p.y + 60, `level.${id}`, { fontFamily: FONT, fontSize: '24px', fontStyle: '700', color: CSS.cream, stroke: '#2a0e14', strokeThickness: 6 }).setOrigin(0.5).setDepth(6);
+      addText(this, p.x, p.y + 54, `level.${id}`, { fontFamily: FONT, fontSize: '24px', fontStyle: '700', color: CSS.cream, stroke: '#2a0e14', strokeThickness: 6 }).setOrigin(0.5).setDepth(6);
       const stars = [];
-      if (n.level && open) {
+      if (open) {
         for (let i = 0; i < 3; i++) stars.push(this.add.image(p.x + (i - 1) * 30, p.y - 62, i < getStars(id) ? 'ui-star' : 'ui-star-off').setScale(0.42).setDepth(6));
       } else {
-        addText(this, p.x, p.y + 88, n.level ? 'map.locked' : 'map.soon', { fontFamily: FONT, fontSize: '19px', fontStyle: '600', color: '#E7DDF0', stroke: '#2a0e14', strokeThickness: 5 }).setOrigin(0.5).setDepth(6);
+        addText(this, p.x, p.y + 80, 'map.locked', { fontFamily: FONT, fontSize: '19px', fontStyle: '600', color: '#E7DDF0', stroke: '#2a0e14', strokeThickness: 5 }).setOrigin(0.5).setDepth(6);
       }
       // the current level pulses
       if (open && getStars(id) === 0) this.tweens.add({ targets: c, scale: 1.1, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
@@ -270,8 +267,8 @@ export default class WorldMapScene extends Phaser.Scene {
 
   buildCard() {
     const w = 980;
-    const h = 104;
-    const card = this.add.container(640, 664).setDepth(20);
+    const h = 92;
+    const card = this.add.container(640, 670).setDepth(20);
     const g = this.add.graphics();
     g.fillStyle(0x000000, 0.4);
     g.fillRoundedRect(-w / 2, -h / 2 + 8, w, h, 24);
@@ -282,12 +279,12 @@ export default class WorldMapScene extends Phaser.Scene {
     g.fillStyle(COLORS.indigo, 1);
     g.fillRoundedRect(-w / 2, -h / 2, 250, h, { tl: 22, tr: 0, bl: 22, br: 0 });
     card.add(g);
-    this.cardName = addText(this, -w / 2 + 125, -16, 'level.sann', { fontFamily: FONT, fontSize: '30px', fontStyle: '700', color: CSS.cream, align: 'center', wordWrap: { width: 230 } }).setOrigin(0.5);
-    this.cardStars = [0, 1, 2].map((i) => this.add.image(-w / 2 + 125 + (i - 1) * 40, 26, 'ui-star-off').setScale(0.46));
-    this.cardIcons = [0, 1, 2].map((i) => this.add.image(-w / 2 + 300 + i * 50, -29, 'shadow').setVisible(false));
-    this.cardMonsters = addText(this, -w / 2 + 280, -29, 'map.sann.monsters', { fontFamily: FONT, fontSize: '22px', fontStyle: '700', color: CSS.red }).setOrigin(0, 0.5);
-    this.cardLesson = addText(this, -w / 2 + 280, 10, 'map.sann.lesson', { fontFamily: FONT, fontSize: '22px', fontStyle: '600', color: CSS.indigo, wordWrap: { width: 670 } }).setOrigin(0, 0.5);
-    this.cardHint = addText(this, -w / 2 + 280, 38, 'map.hint', { fontFamily: FONT, fontSize: '18px', fontStyle: '600', color: '#7A6A5A' }).setOrigin(0, 0.5);
+    this.cardName = addText(this, -w / 2 + 125, -14, 'level.sann', { fontFamily: FONT, fontSize: '30px', fontStyle: '700', color: CSS.cream, align: 'center', wordWrap: { width: 230 } }).setOrigin(0.5);
+    this.cardStars = [0, 1, 2].map((i) => this.add.image(-w / 2 + 125 + (i - 1) * 40, 24, 'ui-star-off').setScale(0.42));
+    this.cardIcons = [0, 1, 2].map((i) => this.add.image(-w / 2 + 300 + i * 50, -27, 'shadow').setVisible(false));
+    this.cardMonsters = addText(this, -w / 2 + 280, -27, 'map.sann.monsters', { fontFamily: FONT, fontSize: '22px', fontStyle: '700', color: CSS.red }).setOrigin(0, 0.5);
+    this.cardLesson = addText(this, -w / 2 + 280, 7, 'map.sann.lesson', { fontFamily: FONT, fontSize: '22px', fontStyle: '600', color: CSS.indigo, wordWrap: { width: 670 } }).setOrigin(0, 0.5);
+    this.cardHint = addText(this, -w / 2 + 280, 33, 'map.hint', { fontFamily: FONT, fontSize: '18px', fontStyle: '600', color: '#7A6A5A' }).setOrigin(0, 0.5);
     card.add([this.cardName, ...this.cardStars, ...this.cardIcons, this.cardMonsters, this.cardLesson, this.cardHint]);
     this.card = card;
   }
@@ -304,9 +301,9 @@ export default class WorldMapScene extends Phaser.Scene {
     setSource(this.cardName, `level.${id}`);
     setSource(this.cardMonsters, `map.${id}.monsters`);
     setSource(this.cardLesson, `map.${id}.lesson`);
-    const open = n.level && isLevelOpen(id);
-    const stars = n.level ? getStars(id) : 0;
-    this.cardStars.forEach((s, i) => s.setTexture(i < stars ? 'ui-star' : 'ui-star-off').setVisible(n.level && open));
+    const open = isLevelOpen(id);
+    const stars = getStars(id);
+    this.cardStars.forEach((s, i) => s.setTexture(i < stars ? 'ui-star' : 'ui-star-off').setVisible(open));
     const list = ICONS[id] || [];
     this.cardIcons.forEach((img, i) => {
       if (!list[i] || !this.textures.exists(list[i])) {
@@ -319,8 +316,7 @@ export default class WorldMapScene extends Phaser.Scene {
     // icons sit left of the monsters line: move the texts right of them
     const shift = list.length ? list.length * 50 + 6 : 0;
     this.cardMonsters.setX(-490 + 280 + shift);
-    if (!n.level) setSource(this.cardHint, 'map.soon');
-    else if (!open) setSource(this.cardHint, () => t('map.needStar', { name: t(LEVELS[this.previousLevel(id)].nameKey) }));
+    if (!open) setSource(this.cardHint, () => t('map.needStar', { name: t(LEVELS[this.previousLevel(id)].nameKey) }));
     else setSource(this.cardHint, 'map.hint');
   }
 
@@ -404,7 +400,7 @@ export default class WorldMapScene extends Phaser.Scene {
   play() {
     if (this.leaving || this.walk) return;
     const n = NODES[this.current];
-    if (!n.level || !isLevelOpen(this.current)) {
+    if (!isLevelOpen(this.current)) {
       playSfx(this, 'sfx-map-locked');
       const c = this.nodes[this.current].container;
       this.tweens.add({ targets: c, x: c.x + 8, duration: 50, yoyo: true, repeat: 3 });
@@ -415,7 +411,7 @@ export default class WorldMapScene extends Phaser.Scene {
     playSfx(this, 'sfx-click');
     const sceneKey = LEVELS[this.current].sceneKey;
     this.cameras.main.fadeOut(500, 11, 13, 26);
-    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start(sceneKey));
+    this.cameras.main.once('camerafadeoutcomplete', () => goToScene(this, sceneKey));
   }
 
   leave(sceneKey) {

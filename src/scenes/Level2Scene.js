@@ -1,3 +1,4 @@
+import { ensureLateTextures } from '../objects/placeholderTextures.js';
 import Phaser from 'phaser';
 import Player from '../objects/Player.js';
 import Mithu from '../objects/Mithu.js';
@@ -23,6 +24,8 @@ import { LEVELS } from '../data/levels.js';
 import { saveResult } from '../data/progress.js';
 import { saveSnapshot } from '../ai/chatContext.js';
 import { settings } from '../data/settings.js';
+import { judge } from '../data/judge.js';
+import { audio } from '../audio/AudioManager.js';
 import { CSS, FONT } from '../data/colors.js';
 import { addText } from '../i18n/i18nText.js';
 import { t } from '../i18n/index.js';
@@ -48,6 +51,7 @@ export default class Level2Scene extends Phaser.Scene {
   }
 
   create() {
+    ensureLateTextures(this);
     this.cameras.main.fadeIn(500, 11, 13, 26);
     this.hitStopLeft = 0;
     this.stats = {
@@ -106,6 +110,10 @@ export default class Level2Scene extends Phaser.Scene {
     this.scene.launch('UI', { level: this, config: lv });
 
     this.wireEvents();
+    audio.playMusic('music-level');
+    this.introSkipped = false;
+    ['keydown-ENTER', 'keydown-SPACE'].forEach((e) => this.input.keyboard.on(e, () => this.skipIntro()));
+    this.input.on('pointerdown', () => this.skipIntro());
     this.showHint();
     if (import.meta.env.DEV) this.setupDebug();
 
@@ -235,20 +243,42 @@ export default class Level2Scene extends Phaser.Scene {
   // ---------- Level steps (called by the LevelDirector) ----------
 
   playIntro(seconds) {
+    this.introTimers = [];
     const cam = this.cameras.main;
     this.player.inputLocked = true;
     cam.stopFollow();
     cam.centerOn(this.jadugar.x + 290, this.jadugar.y + 140);
-    this.time.delayedCall(900, () => this.jadugar.laugh());
-    this.time.delayedCall(1100, () => this.say('mithu.l2.intro1'));
-    this.time.delayedCall((seconds - 3.2) * 1000, () => {
+    this.later(900, () => this.jadugar.laugh());
+    this.later(1100, () => this.say('mithu.l2.intro1'));
+    this.later((seconds - 3.2) * 1000, () => {
       cam.pan(this.player.x, this.player.y - FOLLOW_OFFSET_Y, 2300, 'Sine.easeInOut', true, (c, progress) => {
         if (progress < 1) return;
         cam.startFollow(this.player, true, 0.08, 0.08, 0, FOLLOW_OFFSET_Y);
         this.player.inputLocked = false;
       });
     });
-    this.time.delayedCall((seconds - 1.8) * 1000, () => this.say('mithu.l2.intro2'));
+    this.later((seconds - 1.8) * 1000, () => this.say('mithu.l2.intro2'));
+  }
+
+  // a timer of the intro (so that judge mode can skip the intro)
+  later(ms, fn) {
+    const timer = this.time.delayedCall(ms, fn);
+    this.introTimers.push(timer);
+    return timer;
+  }
+
+  // Judge mode: Enter, Space or a click skips the intro at once
+  skipIntro() {
+    const step = this.director && this.director.step;
+    if (!judge.on || !step || step.type !== 'intro' || this.introSkipped) return;
+    this.introSkipped = true;
+    this.introTimers.forEach((timer) => timer.remove(false));
+    const cam = this.cameras.main;
+    cam.panEffect.reset();
+    cam.centerOn(this.player.x, this.player.y - FOLLOW_OFFSET_Y);
+    cam.startFollow(this.player, true, 0.08, 0.08, 0, FOLLOW_OFFSET_Y);
+    this.player.inputLocked = false;
+    this.director.next();
   }
 
   // Tayyari: bricks to collect, scrolls to store

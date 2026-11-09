@@ -4,8 +4,9 @@ import AjrakCloth from '../ui/AjrakCloth.js';
 import { createPlaceholderTextures } from '../objects/placeholderTextures.js';
 import { COLORS, CSS, FONT_TITLE } from '../data/colors.js';
 import { addText } from '../i18n/i18nText.js';
+import { mark } from '../systems/perfWatch.js';
 
-const SPLASH_TIME = 3200;
+const SPLASH_TIME = 1000; // short, so the title screen opens fast (any key or click skips it)
 
 // Boot: a short splash. The emblem pops in, a light sweeps over it, the subtitle fades in.
 // Any key or click skips it. (The emblem is drawn in code, so nothing must load first.)
@@ -15,7 +16,9 @@ export default class BootScene extends Phaser.Scene {
   }
 
   create() {
+    mark('boot start');
     createPlaceholderTextures(this);
+    mark('boot textures done');
     this.leaving = false;
 
     this.add.rectangle(640, 360, 1280, 720, COLORS.dark);
@@ -65,7 +68,7 @@ export default class BootScene extends Phaser.Scene {
   leave() {
     if (this.leaving) return;
     this.leaving = true;
-    this.cameras.main.fadeOut(300, 11, 13, 26);
+    this.cameras.main.fadeOut(150, 11, 13, 26);
     this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('Preload'));
   }
 }

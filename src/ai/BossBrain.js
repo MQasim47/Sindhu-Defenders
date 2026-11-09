@@ -1,19 +1,27 @@
-// The Jadugar's brain in the boss fight. It uses the SAME idea as HackerBrain, only for his four attacks:
+// The Jadugar's brain in the Face-to-Face Showdown (Level 3). It uses the SAME idea as HackerBrain:
 //
-//   used = how many times he used the attack
-//   hits = how many times it really HIT Dodo
-//   score = (hits + 1) / (used + 2)      <- the higher, the better the attack works against this player
+//   used  = how many times he threw this attack
+//   wrong = how many times the player answered it WRONG or TOO LATE
+//   score = (wrong + 1) / (used + 2)      <- the higher, the weaker the player is against it
 //
-// choose() picks the next attack: 85% of the time it EXPLOITS (the attacks that hit most are
-// chosen more often), 15% of the time it EXPLORES (a random attack, to keep testing).
+// choose() picks the next attack: 85% of the time it EXPLOITS (the attacks the player gets wrong most
+// are chosen more often), 15% of the time it EXPLORES (a random attack, to keep testing).
 // The brain starts with what HackerBrain learned in Level 1 and Level 2 (seedFrom).
 
-export const BOSS_ATTACKS = ['phishing', 'hathoda', 'trojan', 'deepfake'];
-// which attacks exist in which round
+// attack -> the defence that beats it (1 Lantern, 2 Password Shield, 3 Backup Scroll, 4 Code Word)
+export const BOSS_ATTACKS = {
+  phishing: 1, // fake letter from a Behroopia
+  trojan: 1, // shiny FREE gift
+  hammer: 2, // giant hammer = brute-force password attack
+  ransom: 3, // padlock chain = ransomware
+  deepfake: 4, // Mithu-voice bubble
+};
+export const ATTACK_IDS = Object.keys(BOSS_ATTACKS);
+// which attacks exist in which round (the finale is a special deepfake, see BossScene)
 export const ROUND_ATTACKS = {
-  1: ['phishing', 'hathoda'],
-  2: ['phishing', 'hathoda', 'trojan'],
-  3: ['phishing', 'hathoda', 'trojan', 'deepfake'],
+  1: ['phishing', 'trojan', 'hammer'],
+  2: ['phishing', 'trojan', 'hammer', 'ransom'],
+  3: ['phishing', 'trojan', 'hammer', 'ransom', 'deepfake'],
 };
 export const EXPLORE_CHANCE = 0.15;
 
@@ -21,84 +29,71 @@ export default class BossBrain {
   constructor(random = Math.random) {
     this.random = random;
     this.stats = {};
-    BOSS_ATTACKS.forEach((name) => (this.stats[name] = { used: 0, hits: 0 }));
+    ATTACK_IDS.forEach((id) => (this.stats[id] = { used: 0, wrong: 0 }));
     this.seeded = []; // attacks that started with knowledge from the earlier levels
-    this.focus = null; // the attack the boss likes best right now
-    this.mode = 'exploit';
+    this.mode = 'exploit'; // what the last choice was
     this.last = null; // the attack used last, and how many times in a row (so it never gets boring)
     this.streak = 0;
   }
 
-  // runStats = HackerBrain stats saved by runMemory: { phishing: { faced, fails }, trojan, hathoda ... }
-  // Level 1 phishing -> Phishing Barish, Level 1 trojan (gifts opened) -> Trojan Tohfa,
-  // Level 2 hathoda (walls broken) -> Hathoda Lehar.
+  // runStats = HackerBrain counts saved by runMemory: { phishing: { faced, fails }, trojan, hathoda, taala ... }
+  // Level 1 phishing -> fake letter, Level 1 trojan (gifts opened) -> FREE gift,
+  // Level 2 hathoda (walls broken) -> hammer, Level 2 taala (locked without a backup) -> padlock chain.
   seedFrom(runStats = {}) {
-    const map = { phishing: 'phishing', trojan: 'trojan', hathoda: 'hathoda' };
-    Object.entries(map).forEach(([old, name]) => {
+    const map = { phishing: 'phishing', trojan: 'trojan', hathoda: 'hammer', taala: 'ransom' };
+    Object.entries(map).forEach(([old, id]) => {
       const s = runStats[old];
       if (!s || !s.faced) return;
       const used = Math.min(s.faced, 6); // old knowledge counts, but not too much
-      const hits = Math.min(Math.round((s.fails / s.faced) * used), used);
-      this.stats[name] = { used, hits };
-      if (hits > 0) this.seeded.push(name);
+      const wrong = Math.min(Math.round((s.fails / s.faced) * used), used);
+      this.stats[id] = { used, wrong };
+      if (wrong > 0) this.seeded.push(id);
     });
-    this.focus = this.favourite(1);
   }
 
-  score(name) {
-    const s = this.stats[name];
-    return (s.hits + 1) / (s.used + 2);
+  score(id) {
+    const s = this.stats[id];
+    return (s.wrong + 1) / (s.used + 2);
   }
 
-  // the attack with the best score among the ones of this round (deepfake is a special trick, kept apart)
-  favourite(round) {
-    const names = ROUND_ATTACKS[round].filter((n) => n !== 'deepfake');
-    return names.reduce((a, b) => (this.score(b) > this.score(a) ? b : a));
-  }
-
-  // the next attack. exclude = names that must not be used now (for example on cooldown)
+  // the next attack. exclude = ids that must not be used now
   choose(round, exclude = []) {
-    let names = ROUND_ATTACKS[round].filter((n) => !exclude.includes(n));
+    let ids = ROUND_ATTACKS[round].filter((n) => !exclude.includes(n));
     // the same attack three times in a row is boring: after two, pick something else
-    if (this.streak >= 2 && names.length > 1) names = names.filter((n) => n !== this.last);
+    if (this.streak >= 2 && ids.length > 1) ids = ids.filter((n) => n !== this.last);
     const explore = this.random() < EXPLORE_CHANCE;
     this.mode = explore ? 'explore' : 'exploit';
     // exploit: weight = score squared (as in HackerBrain). explore: random weights.
-    const raw = names.map((n) => (explore ? 0.15 + this.random() : this.score(n) ** 2));
+    const raw = ids.map((n) => (explore ? 0.15 + this.random() : this.score(n) ** 2));
     const total = raw.reduce((a, b) => a + b, 0);
     let pick = this.random() * total;
-    for (let i = 0; i < names.length; i++) {
+    for (let i = 0; i < ids.length; i++) {
       pick -= raw[i];
-      if (pick <= 0) return names[i];
+      if (pick <= 0) return ids[i];
     }
-    return names[names.length - 1];
+    return ids[ids.length - 1];
   }
 
-  recordUsed(name) {
-    this.stats[name].used++;
-    this.streak = name === this.last ? this.streak + 1 : 1;
-    this.last = name;
+  recordThrown(id) {
+    this.stats[id].used++;
+    this.streak = id === this.last ? this.streak + 1 : 1;
+    this.last = id;
   }
 
-  recordHit(name) {
-    this.stats[name].hits++;
+  recordWrong(id) {
+    this.stats[id].wrong++;
   }
 
-  // Did his favourite change? Returns the NEW favourite (a name) or null. Call after a hit.
-  checkFocus(round) {
-    const now = this.favourite(round);
-    if (now === this.focus) return null;
-    // only switch when the new one is clearly better (a tie never makes him change his mind)
-    if (this.score(now) - this.score(this.focus || now) < 0.05) return null;
-    this.focus = now;
-    return now;
+  // true if he is using a known weakness: the last choice was an exploit and the score is high
+  isExploiting(id) {
+    return this.mode === 'exploit' && this.score(id) >= 0.6;
   }
 
-  // the attack that hit Dodo most (by number of hits), for the tip and the report
-  topHitter() {
+  // the attack the player missed most in THIS fight (for the tip and the report)
+  worst(fightWrong) {
     let best = null;
-    BOSS_ATTACKS.forEach((n) => {
-      if (this.stats[n].hits > 0 && (!best || this.stats[n].hits > this.stats[best].hits)) best = n;
+    ATTACK_IDS.forEach((id) => {
+      if ((fightWrong[id] || 0) > 0 && (!best || fightWrong[id] > fightWrong[best])) best = id;
     });
     return best;
   }

@@ -8,16 +8,10 @@ import { COLORS, CSS, FONT } from '../data/colors.js';
 import { addText } from '../i18n/i18nText.js';
 import { t } from '../i18n/index.js';
 import { playSfx } from '../fx/sound.js';
+import { getPlayerName, setPlayerName } from '../data/playerName.js';
+import { goToScene } from '../systems/sceneFlow.js';
+import { audio } from '../audio/AudioManager.js';
 
-const NAME_KEY = 'sindhu-defenders-player-name';
-
-function savedName() {
-  try {
-    return localStorage.getItem(NAME_KEY) || '';
-  } catch (e) {
-    return '';
-  }
-}
 
 // The "Cyber Rakshak" certificate after the boss: the player types a name, and the card shows
 // the total stars, the 5 lessons, the final AI report (also what the boss learned in the fight)
@@ -35,6 +29,7 @@ export default class ReportScene extends Phaser.Scene {
     this.add.image(640, 360, 'fx-glow').setScale(14, 8).setTint(0x2b3580).setAlpha(0.45);
 
     this.run = loadRun();
+    audio.playMusic('music-menu');
     this.drawCard();
     this.buildName();
     this.buildStars();
@@ -82,7 +77,7 @@ export default class ReportScene extends Phaser.Scene {
     const node = input.node;
     node.type = 'text';
     node.maxLength = 22;
-    node.value = savedName();
+    node.value = getPlayerName();
     node.placeholder = t('cert.placeholder');
     node.autocomplete = 'off';
     // the game listens to the keyboard on the whole window: typed keys must not reach it
@@ -92,11 +87,7 @@ export default class ReportScene extends Phaser.Scene {
     });
     node.addEventListener('keyup', (e) => e.stopPropagation());
     node.addEventListener('input', () => {
-      try {
-        localStorage.setItem(NAME_KEY, node.value);
-      } catch (e) {
-        // not saved: fine
-      }
+      setPlayerName(node.value);
     });
     this.nameInput = input;
     this.time.delayedCall(700, () => node.focus());
@@ -146,6 +137,6 @@ export default class ReportScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     this.cameras.main.fadeOut(500, 11, 13, 26);
-    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start(sceneKey));
+    this.cameras.main.once('camerafadeoutcomplete', () => goToScene(this, sceneKey));
   }
 }

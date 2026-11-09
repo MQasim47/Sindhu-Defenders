@@ -5,9 +5,11 @@ import { LEVELS, LEVEL_ORDER } from '../data/levels.js';
 import { getStars } from '../data/progress.js';
 import { COLORS, CSS, FONT } from '../data/colors.js';
 import { playSfx } from '../fx/sound.js';
+import { judge } from '../data/judge.js';
 
 // A level is open when it is the first one, or the one before it was finished with at least 1 star.
 export function isLevelOpen(id) {
+  if (judge.on) return true; // judge mode: everything is open
   const i = LEVEL_ORDER.indexOf(id);
   return i <= 0 || getStars(LEVEL_ORDER[i - 1]) >= 1;
 }
@@ -15,6 +17,7 @@ export function isLevelOpen(id) {
 // A simple level chooser (the fallback when the World Map cannot open): one card per level with its stars.
 // onPick(sceneKey) is called when an open level is chosen.
 export function openLevelSelect(scene, onPick) {
+  scene.modalOpen = (scene.modalOpen || 0) + 1;
   const depth = 500;
   const blocker = scene.add.rectangle(640, 360, 1280, 720, 0x0b0d1a, 0.7).setInteractive().setDepth(depth);
   const card = scene.add.container(640, 360).setDepth(depth + 1);
@@ -81,6 +84,7 @@ export function openLevelSelect(scene, onPick) {
   });
 
   const close = () => {
+    scene.modalOpen = Math.max(0, (scene.modalOpen || 1) - 1);
     scene.tweens.add({ targets: card, scale: 0.7, alpha: 0, duration: 160, ease: 'Cubic.In', onComplete: () => {
       card.destroy();
       blocker.destroy();

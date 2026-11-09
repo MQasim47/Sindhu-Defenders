@@ -61,6 +61,12 @@ export default class Button extends Phaser.GameObjects.Container {
       });
     }
 
+    // keyboard focus: a gold ring around the button (setFocused), and press() = the same as a click
+    this.focusRing = scene.add.graphics().setVisible(false);
+    this.focusRing.lineStyle(6, 0xffd24a, 1);
+    this.focusRing.strokeRoundedRect(-width / 2 - 8, -height / 2 - 8, width + 16, height + 20, r + 8);
+    this.add(this.focusRing);
+
     this.on('pointerover', () => this.enabled && this.grow(1.08, 1.08));
     this.on('pointerout', () => this.grow(1, 1));
     this.on('pointerdown', () => this.enabled && this.grow(1.06, 0.88));
@@ -72,6 +78,18 @@ export default class Button extends Phaser.GameObjects.Container {
     });
 
     scene.add.existing(this);
+  }
+
+  setFocused(on) {
+    this.focusRing.setVisible(on);
+    this.grow(on ? 1.06 : 1, on ? 1.06 : 1);
+  }
+
+  // the same as a mouse click
+  press() {
+    if (!this.enabled) return;
+    playSfx(this.scene, 'sfx-click');
+    this.onClick();
   }
 
   grow(scaleX, scaleY) {

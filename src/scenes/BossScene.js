@@ -1,81 +1,81 @@
+import { ensureLateTextures } from '../objects/placeholderTextures.js';
 import Phaser from 'phaser';
-import Player from '../objects/Player.js';
 import Mithu from '../objects/Mithu.js';
 import Jadugar from '../objects/Jadugar.js';
-import Lantern from '../objects/Lantern.js';
 import GroundFx from '../fx/GroundFx.js';
 import SpeechBubble from '../ui/SpeechBubble.js';
-import KeyHint from '../ui/KeyHint.js';
 import HackerBrain from '../ai/HackerBrain.js';
-import BossBrain, { ROUND_ATTACKS } from '../ai/BossBrain.js';
+import BossBrain, { BOSS_ATTACKS, ATTACK_IDS } from '../ai/BossBrain.js';
 import { loadRun, saveBoss } from '../ai/runMemory.js';
 import { saveSnapshot } from '../ai/chatContext.js';
-import { buildBossArena, ARENA } from '../level/bossArena.js';
-import { LetterRain, SlamWave, GiftThrow } from '../boss/BossAttacks.js';
-import Deepfake from '../boss/Deepfake.js';
+import { buildBossArena } from '../level/bossArena.js';
+import DodoFigure from '../boss/DodoFigure.js';
+import { FlyingAttack } from '../boss/showdownParts.js';
 import Celebration from '../boss/Celebration.js';
 import { openCodeWordPicker } from '../boss/CodeWordPicker.js';
 import { LEVELS } from '../data/levels.js';
-import { saveResult, getStars } from '../data/progress.js';
+import { saveResult } from '../data/progress.js';
 import { settings } from '../data/settings.js';
+import { addText, setSource } from '../i18n/i18nText.js';
 import { t } from '../i18n/index.js';
+import { CSS, FONT } from '../data/colors.js';
 import { playSfx } from '../fx/sound.js';
+import { audio } from '../audio/AudioManager.js';
 
-// ---- the numbers of the fight (all in one place) ----
-const DODO_MAX = 100; // Dodo's health
-const BOSS_MAX = 360; // the Jadugar's health: three rounds of 120
-const HEAL = 30; // health Dodo gets back between rounds
-const BEAM_DPS = 20; // lantern beam damage per second
-const SHIELD_TIME = 1.5;
-const SHIELD_COOLDOWN = 4;
-const HURT_PROTECTION = 1.0; // seconds without damage after a hit
-const DEEPFAKE_COOLDOWN = 16;
-const HOVER = 70; // how high the Jadugar floats
-const BEAM_RANGE = 410;
-const BEAM_HALF = 0.65;
-const BUG_SECONDS = 3; // the bugs of a Trojan gift bite for this long (4 damage each second)
+// ---- the numbers of the showdown (all in one place) ----
+const HEARTS = 5; // Dodo's hearts
+const TOTAL_HITS = 15; // the Jadugar's health: 15 attacks that Dodo sends back
+const ROUND_END_HITS = { 1: 5, 2: 10 }; // round 1 ends after 5 hits, round 2 after 10 hits
+const FINALE_HITS = 14; // after 14 hits the Jadugar changes into a fake Mithu: the last question
+const SECONDS = { 1: 5, 2: 3.5, 3: 2.5 }; // time to answer one attack
+const GAP = { 1: 1.5, 2: 1.2, 3: 1.0 }; // pause before the next attack
+const MAX_AIR = { 1: 1, 2: 1, 3: 2 }; // attacks in the air at the same time
+const FINALE_SECONDS = 8;
 
-// Boss: Miri Fort. A fighting-game style battle in a top-down arena (Tekken feel, cyber moves).
-//   pick  -> choose the secret code word (4 picture cards)
-//   intro -> "ROUND n - FIGHT!"
-//   fight -> Dodo: lantern beam (hold Q), Firewall Shield (E), jump (Space). The Jadugar attacks.
-//   roundEnd -> short break, Dodo gets some health back
-//   ko / won / lose
-// The Jadugar chooses his attacks with BossBrain (the same learning idea as HackerBrain).
+const FEET_Y = 565;
+const DODO_X = 290;
+const JAD_X = 1000;
+
+// Level 3: Miri Fort, the Face-to-Face Showdown. Side view, like a fighting game.
+// Dodo (left) and the Jadugar (right) stand face to face. The Jadugar throws ONE attack at a time:
+// a big picture that flies towards Dodo with a timer ring. Dodo answers with the right defence button
+// (keys 1-4): 1 Lantern, 2 Password Shield, 3 Backup Scroll, 4 Code Word. A right answer sends the attack
+// back and hurts the Jadugar. A wrong or late answer costs Dodo a heart and Mithu says the right defence.
+//   states: pick -> intro -> fight -> roundEnd -> ... -> finale -> ko -> won      (or lose)
 export default class BossScene extends Phaser.Scene {
   constructor() {
     super('Boss');
   }
 
+  // data = { startRound, codeWord } (a retry starts at the round where Dodo lost)
+  init(data) {
+    this.firstRound = (data && data.startRound) || 1;
+    this.codeWord = (data && data.codeWord) || null;
+  }
+
   create() {
+    ensureLateTextures(this);
     this.cameras.main.fadeIn(500, 11, 13, 26);
     this.cameras.main.setZoom(1);
     this.time.timeScale = 1;
     this.tweens.timeScale = 1;
     this.levelData = LEVELS.miri;
     this.state = 'pick';
-    this.round = 1;
+    this.round = this.firstRound;
     this.slow = 1;
     this.slowTimer = 0;
     this.hitStopLeft = 0;
     this.cutscene = true; // Esc is off while the code word is chosen
     this.said = {};
-    this.codeWord = null;
-    this.dodoHp = DODO_MAX;
-    this.bossHp = BOSS_MAX;
+    this.hints = {};
+    this.hearts = HEARTS;
+    this.hits = ROUND_END_HITS[this.firstRound - 1] || 0; // a retry starts where the round began
     this.combo = 0;
     this.comboTimer = 0;
-    this.beamTick = 0;
-    this.nextAttackIn = 1.5;
-    this.teleportIn = 6;
-    this.deepfakeCd = 6;
+    this.spawnIn = 1;
     this.tauntCd = 0;
-    this.bugsLeft = 0;
-    this.bugTick = 0;
-    this.stunLeft = 0;
-    this.jadBusy = false;
-    this.hitLog = { phishing: 0, hathoda: 0, trojan: 0, deepfake: 0 }; // what really hit Dodo in THIS fight
-    this.stats = { caught: 0, sneaked: 0, giftsOpened: 0, giftsRevealed: 0, earned: 0 };
+    this.wrongLog = {}; // attack id -> how many times Dodo missed it in THIS fight
+    this.stats = { caught: 0, sneaked: 0, giftsOpened: 0, giftsRevealed: 0, earned: 0 }; // for the chat
 
     // what the AI learned in the earlier levels
     const run = loadRun();
@@ -86,30 +86,20 @@ export default class BossScene extends Phaser.Scene {
 
     this.arena = buildBossArena(this);
     this.fx = new GroundFx(this);
+    audio.playMusic('music-boss');
 
-    const bounds = { minY: ARENA.minY, maxY: ARENA.maxY, minXAt: () => ARENA.minX, maxXAt: () => ARENA.maxX };
-    this.player = new Player(this, 640, 620, bounds, { colliders: [] }, this.fx);
-    this.player.inputLocked = true;
-    this.lantern = new Lantern(this, this.player);
-    this.mithu = new Mithu(this, this.player);
-    this.bubble = new SpeechBubble(this);
-    this.eHint = new KeyHint(this, 'E');
+    this.dodo = new DodoFigure(this, DODO_X, FEET_Y, 400);
     this.buildJadugar();
-    this.buildShield();
-    this.buildBugs();
-    this.buildSwirls();
+    this.buildMithu();
+    this.buildEffects();
+    this.keys = this.input.keyboard.addKeys({ one: 'ONE', two: 'TWO', three: 'THREE', four: 'FOUR', n1: 'NUMPAD_ONE', n2: 'NUMPAD_TWO', n3: 'NUMPAD_THREE', n4: 'NUMPAD_FOUR' });
 
-    this.letters = new LetterRain(this);
-    this.slam = new SlamWave(this);
-    this.gifts = new GiftThrow(this);
-    this.attacks = { phishing: this.letters, hathoda: this.slam, trojan: this.gifts };
-    this.deepfake = new Deepfake(this);
+    this.air = [0, 1, 2].map(() => new FlyingAttack(this));
     this.party = new Celebration(this);
 
     this.scene.stop('BossUI');
     this.scene.launch('BossUI', { level: this });
 
-    this.useKey = this.player.keys.use;
     if (import.meta.env.DEV) this.setupDebug();
     this.events.once('shutdown', () => {
       this.time.timeScale = 1;
@@ -117,61 +107,71 @@ export default class BossScene extends Phaser.Scene {
       saveSnapshot(this.game, this);
     });
 
-    // Mithu whispers, then the cards come
-    this.time.delayedCall(900, () => this.say('mithu.boss.whisper'));
-    this.time.delayedCall(1500, () =>
-      openCodeWordPicker(this, (name) => {
-        this.codeWord = name;
-        this.cutscene = false;
-        this.startRound(1);
-      }),
-    );
+    if (this.codeWord) {
+      // a retry: the secret code word is already chosen
+      this.time.delayedCall(600, () => this.startRound(this.round));
+    } else {
+      this.time.delayedCall(900, () => this.say('mithu.boss.whisper'));
+      this.time.delayedCall(1500, () =>
+        openCodeWordPicker(this, (name) => {
+          this.codeWord = name;
+          this.startRound(1);
+        }),
+      );
+    }
   }
 
   // ---------- Building ----------
 
   buildJadugar() {
-    this.jadGround = { x: 640, y: 470 };
-    this.jadHover = HOVER;
-    this.jadHoverTarget = HOVER;
-    this.jadMove = { x: 640, y: 470, wait: 1.5 };
-    this.jad = new Jadugar(this, 640, 470 - HOVER);
-    this.jad.setScale(1.5);
-    this.jad.shadow.setVisible(false);
-    this.jadShadow = this.add.image(640, 470, 'shadow').setScale(3.2, 1.5).setAlpha(0.5);
-    // his purple shield: the lantern must shine on it for a moment to break it
-    this.jadShield = { on: false, hp: 1 };
-    this.shieldGlow = this.add.image(0, 0, 'fx-glow').setTint(0xb48cff).setBlendMode(Phaser.BlendModes.ADD).setScale(5, 5.5).setAlpha(0).setVisible(false);
-    this.shieldRing = this.add.image(0, 0, 'fx-ring').setTint(0xd8b8ff).setBlendMode(Phaser.BlendModes.ADD).setScale(5.5, 6).setAlpha(0).setVisible(false);
+    this.jad = new Jadugar(this, JAD_X, FEET_Y);
+    this.jad.setScale(2.2);
+    this.jadHome = { x: JAD_X, y: FEET_Y };
+    this.jadFloat = 0;
+    // the Jadugar's speech bubble (taunts)
+    const box = this.add.container(JAD_X - 120, 215).setDepth(900).setVisible(false);
+    const bg = this.add.graphics();
+    bg.fillStyle(0xfff6dc, 1);
+    bg.fillRoundedRect(-200, -40, 400, 80, 22);
+    bg.lineStyle(5, 0x3a1c16, 1);
+    bg.strokeRoundedRect(-200, -40, 400, 80, 22);
+    bg.fillStyle(0xfff6dc, 1);
+    bg.fillTriangle(60, 38, 110, 38, 120, 76);
+    this.tauntText = addText(this, 0, 0, 'boss.taunt.phishing', { fontFamily: FONT, fontSize: '26px', fontStyle: '700', color: CSS.ink, align: 'center', wordWrap: { width: 370 } }).setOrigin(0.5);
+    box.add([bg, this.tauntText]);
+    this.tauntBox = box;
   }
 
-  // Dodo's Firewall Shield (E)
-  buildShield() {
-    this.shield = { on: false, t: 0, cd: 0 };
-    this.shieldImage = this.add.image(0, 0, 'boss-shield').setOrigin(0.5, 1).setVisible(false);
-    this.shieldFlash = this.add.image(0, 0, 'fx-glow').setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setScale(2.4, 3).setAlpha(0).setVisible(false);
+  // Mithu flies near Dodo (he follows a small invisible anchor, so the Mithu class can be reused)
+  buildMithu() {
+    this.anchor = new Phaser.Events.EventEmitter();
+    Object.assign(this.anchor, { x: DODO_X - 60, y: FEET_Y - 250, z: 0, facingDir: 1, vx: 0, vy: 0 });
+    this.mithu = new Mithu(this, this.anchor);
+    this.mithu.setScale(1.7);
+    this.bubble = new SpeechBubble(this);
   }
 
-  // the bugs that bite Dodo after a Trojan gift
-  buildBugs() {
-    this.bugs = [0, 1, 2].map(() => this.add.image(0, 0, 'bug').setVisible(false));
-  }
-
-  buildSwirls() {
-    this.swirls = [];
-    for (let i = 0; i < 4; i++) this.swirls.push(this.add.image(0, 0, 'fx-swirl').setBlendMode(Phaser.BlendModes.ADD).setTint(0xb48cff).setVisible(false));
+  // the pictures of the defences (made once, shown when needed)
+  buildEffects() {
+    this.beam = this.add.image(0, 0, 'fx-cone').setOrigin(0, 0.5).setBlendMode(Phaser.BlendModes.ADD).setVisible(false).setDepth(850);
+    this.wall = this.add.image(0, 0, 'boss-shield').setOrigin(0.5, 1).setVisible(false).setDepth(840);
+    this.wallGlow = this.add.image(0, 0, 'fx-glow').setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setScale(4, 5).setVisible(false).setDepth(839);
+    this.scrollFx = this.add.image(0, 0, 'backup-scroll').setVisible(false).setDepth(850);
+    this.lockFx = this.add.image(0, 0, 'icon-lock').setVisible(false).setDepth(860);
+    this.stamp = addText(this, 0, 0, 'boss.fake', { fontFamily: FONT, fontSize: '54px', fontStyle: '700', color: '#FF4A3A', stroke: '#2a0e14', strokeThickness: 9 }).setOrigin(0.5).setVisible(false).setDepth(870);
+    this.swirls = [0, 1].map(() => this.add.image(0, 0, 'fx-swirl').setBlendMode(Phaser.BlendModes.ADD).setTint(0xb48cff).setVisible(false).setDepth(870));
   }
 
   swirl(x, y) {
     const s = this.swirls.find((sw) => !sw.visible);
     if (!s) return;
-    s.setPosition(x, y).setVisible(true).setScale(0.2).setAlpha(1).setAngle(0).setDepth(900);
-    this.tweens.add({ targets: s, scale: 1, angle: 280, duration: 520, ease: 'Sine.Out' });
+    s.setPosition(x, y).setVisible(true).setScale(0.3).setAlpha(1).setAngle(0);
+    this.tweens.add({ targets: s, scale: 1.8, angle: 280, duration: 520, ease: 'Sine.Out' });
     this.tweens.add({ targets: s, alpha: 0, delay: 300, duration: 330, onComplete: () => s.setVisible(false) });
     playSfx(this, 'sfx-teleport');
   }
 
-  // ---------- Small helpers used by the attacks ----------
+  // ---------- Small helpers ----------
 
   say(key) {
     this.bubble.say(t(key));
@@ -183,16 +183,10 @@ export default class BossScene extends Phaser.Scene {
     this.say(key);
   }
 
-  ui() {
-    if (!this.scene.isActive('BossUI')) return null;
-    const ui = this.scene.get('BossUI');
-    return ui && ui.ready ? ui : null;
-  }
-
-  // call a method of the HUD (if it is ready)
   hud(method, ...args) {
-    const ui = this.ui();
-    if (ui) ui[method](...args);
+    if (!this.scene.isActive('BossUI')) return;
+    const ui = this.scene.get('BossUI');
+    if (ui && ui.ready) ui[method](...args);
   }
 
   impact(ms, shake) {
@@ -200,61 +194,23 @@ export default class BossScene extends Phaser.Scene {
     if (!settings.low && !settings.reduced) this.cameras.main.shake(130, shake);
   }
 
-  // is the point (x, y) inside the lantern light? pad = extra size of the thing (pixels)
-  inBeam(x, y, pad = 0) {
-    const L = this.lantern;
-    if (!L.on || L.amount < 0.6) return false;
-    const dx = x - L.origin.x;
-    const dy = y - L.origin.y;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    if (d > BEAM_RANGE + pad) return false;
-    if (d < 20) return true;
-    const a = Math.abs(Phaser.Math.Angle.Wrap(Math.atan2(dy, dx) - L.beam));
-    return a < BEAM_HALF + 0.12 * (1 - d / BEAM_RANGE) + pad / Math.max(d, 60);
-  }
-
-  shieldBlocks(x, y) {
-    const s = this.shield;
-    if (!s.on) return false;
-    return Math.abs(x - this.shieldImage.x) < 52 && y > this.player.y - 200 && y < this.player.y + 30;
-  }
-
-  // a letter or a gift was burned by the lantern: a small hit for the combo
-  burned(x, y) {
-    this.comboHit();
-    this.fx.sparkle(x, y);
-    playSfx(this, 'sfx-beam-hit');
-  }
-
-  // where the Jadugar's body is (for the beam and the sparks)
   get jadBody() {
-    return { x: this.jad.x, y: this.jad.y - 110 };
+    return { x: this.jad.x - 10, y: this.jad.y - 230 };
   }
 
-  // Jadugar poses for the attacks
-  jadSlamPrep(on) {
-    this.jadHoverTarget = on ? 0 : HOVER;
-    this.jadBusy = on;
-    if (on) this.tweens.add({ targets: this.jad.bodyGroup, scaleY: 1.12, duration: 560, ease: 'Sine.Out' });
+  get dodoChest() {
+    return { x: DODO_X + 90, y: FEET_Y - 220 };
   }
 
-  jadSlam() {
-    this.tweens.add({ targets: this.jad.bodyGroup, scaleY: 0.85, scaleX: 1.12, duration: 90, yoyo: true, onComplete: () => this.jad.bodyGroup.setScale(1) });
-    this.fx.ring(this.jadGround.x, this.jadGround.y);
-  }
-
-  jadWindup() {
-    this.jad.point(this.player.x, this.player.y - 40);
-    this.tweens.add({ targets: this.jad.ball, scale: 1.4, duration: 300, yoyo: true });
-  }
-
-  // ---------- The fight ----------
+  // ---------- Rounds ----------
 
   startRound(n) {
     this.round = n;
     this.state = 'intro';
-    this.player.inputLocked = false;
+    this.cutscene = true;
     this.hud('setRound', n);
+    this.hud('setBossHp', (TOTAL_HITS - this.hits) / TOTAL_HITS);
+    this.hud('setHearts', this.hearts);
     this.hud('showBanner', ['boss.round', { n }], ['boss.fight'], 900);
     playSfx(this, 'sfx-round');
     if (!settings.reduced) {
@@ -265,222 +221,357 @@ export default class BossScene extends Phaser.Scene {
       playSfx(this, 'sfx-fight');
       this.state = 'fight';
       this.cutscene = false;
-      this.nextAttackIn = 1.2;
+      this.spawnIn = 1.2;
       this.say(`mithu.boss.round${n}`);
-      if (n === 1) this.time.delayedCall(4200, () => this.seedLine());
-      if (n === 2) this.time.delayedCall(4200, () => this.sayOnce('shieldHelp', 'mithu.boss.shieldHelp'));
+      if (n === 1 && this.firstRound === 1) this.time.delayedCall(4500, () => this.seedLine());
     });
   }
 
-  // Mithu tells what the boss remembers from the earlier levels
+  // Mithu tells what the Jadugar remembers from the earlier levels
   seedLine() {
     const b = this.bossBrain;
-    const best = ['trojan', 'phishing', 'hathoda'].filter((n) => b.seeded.includes(n)).sort((x, y) => b.score(y) - b.score(x))[0];
-    if (best) this.say(`mithu.boss.seed${best[0].toUpperCase()}${best.slice(1)}`);
-  }
-
-  activeAttacks() {
-    return Object.values(this.attacks).filter((a) => a.active).length;
-  }
-
-  // the Jadugar picks and starts the next attack (never more than 2 at once)
-  pickAttack() {
-    const b = this.bossBrain;
-    const exclude = [];
-    Object.entries(this.attacks).forEach(([name, a]) => a.active && exclude.push(name));
-    if (this.deepfakeCd > 0 || this.activeAttacks() > 0 || this.jadBusy) exclude.push('deepfake');
-    const options = ROUND_ATTACKS[this.round].filter((n) => !exclude.includes(n));
-    if (!options.length) return null;
-    const name = b.choose(this.round, exclude);
-    b.recordUsed(name);
-    return name;
-  }
-
-  startAttack(name) {
-    if (name === 'deepfake') {
-      this.startDeepfake();
-      return;
-    }
-    if (name === 'phishing') this.letters.start(this.round);
-    else this.attacks[name].start();
-    this.hud('setJadugarMood', 'laugh');
-  }
-
-  startDeepfake() {
-    this.deepfakeCd = DEEPFAKE_COOLDOWN;
-    this.jadBusy = true;
-    this.clearJadShield();
-    this.swirl(this.jad.x, this.jad.y - 80);
-    this.jad.setVisible(false);
-    this.jadShadow.setVisible(false);
-    this.mithu.setVisible(false); // the real Mithu is hiding among the three
-    this.hud('taunt', 'boss.taunt.deepfake');
-    this.deepfake.start();
-  }
-
-  // The Deepfake Chaal ended. result: true = key to the real Mithu, false = to a fake, null = time ran out
-  deepfakeDone(result) {
-    this.time.delayedCall(560, () => {
-      this.mithu.setVisible(true);
-      this.jad.setVisible(true);
-      this.jadShadow.setVisible(true);
-      this.jadBusy = false;
-      this.swirl(this.jad.x, this.jad.y - 80);
-      this.nextAttackIn = 2.2;
-    });
-    if (result === true) {
-      this.say('mithu.boss.rightKey');
-      playSfx(this, 'sfx-key-right');
-      this.stunLeft = 3;
-      this.jad.beaten();
-      this.hud('setJadugarMood', 'angry');
-      this.impact(160, 0.01);
-      this.damageBoss(60);
-    } else if (result === false) {
-      this.bossBrain.recordHit('deepfake');
-      this.hitLog.deepfake++;
-      this.say('mithu.boss.wrongKey');
-      playSfx(this, 'sfx-key-wrong');
-      this.player.hurtTimer = 0;
-      this.hurtDodo(30, 'deepfake', 0, true);
-      this.hud('setJadugarMood', 'laugh');
-    }
-  }
-
-  // ---------- Health ----------
-
-  // amount of damage from an attack. attack = 'phishing' | 'hathoda' | 'trojan' | 'deepfake'
-  // dir = knock back to the left (-1) or right (1). countOnly = it is already counted by the caller
-  hurtDodo(amount, attack, dir = 0, countOnly = false) {
-    if (this.state !== 'fight') return;
-    const p = this.player;
-    if (p.hurtTimer > 0) return;
-    p.hurtTimer = HURT_PROTECTION;
-    this.dodoHp = Math.max(0, this.dodoHp - amount);
-    if (!countOnly) {
-      this.bossBrain.recordHit(attack);
-      this.hitLog[attack]++;
-    }
-    if (dir) p.knockback(dir);
-    else p.pulse(1.25, 0.8);
-    this.impact(70, 0.005);
-    if (!settings.low && !settings.reduced) this.cameras.main.flash(90, 255, 70, 70);
-    playSfx(this, 'sfx-hit');
-    this.hud('setDodoHp', this.dodoHp / DODO_MAX);
-    this.hud('setJadugarMood', 'laugh');
-    this.combo = 0;
-    this.hud('setCombo', 0);
-    if (this.dodoHp <= 0) {
-      this.lose();
-      return;
-    }
-    this.checkNewFocus();
-  }
-
-  // the AI noticed which attack works best on this player
-  checkNewFocus() {
-    const now = this.bossBrain.checkFocus(this.round);
-    if (!now || this.tauntCd > 0) return;
-    this.tauntCd = 10;
-    this.hud('taunt', `boss.taunt.${now}`);
-    this.time.delayedCall(900, () => this.say(`mithu.boss.noticed.${now}`));
-  }
-
-  // bugs bite for a few seconds (the touch of the gift itself was counted as a hit)
-  igniteBugs() {
-    this.bugsLeft = BUG_SECONDS;
-    this.bugTick = 1;
-    playSfx(this, 'sfx-bugs');
-  }
-
-  damageBoss(amount) {
-    if (this.state !== 'fight' || amount <= 0) return;
-    const floor = (BOSS_MAX * (3 - this.round)) / 3; // the end of this round
-    this.bossHp = Math.max(floor, this.bossHp - amount);
-    this.hud('setBossHp', this.bossHp / BOSS_MAX);
-    if (this.bossHp <= floor) {
-      if (this.round < 3) this.endRound();
-      else this.ko();
-    }
-  }
-
-  // one beam hit for the combo counter
-  comboHit() {
-    this.combo++;
-    this.comboTimer = 1.3;
-    this.hud('setCombo', this.combo);
-    if (this.combo > 0 && this.combo % 5 === 0) playSfx(this, 'sfx-combo');
+    const best = b.seeded.slice().sort((x, y) => b.score(y) - b.score(x))[0];
+    if (best) this.say(`mithu.boss.seed.${best}`);
   }
 
   endRound() {
     this.state = 'roundEnd';
     this.cutscene = true;
-    this.clearAttacks();
-    this.clearJadShield();
-    this.deepfake.clear();
-    this.mithu.setVisible(true);
-    this.jad.setVisible(true);
-    this.jadShadow.setVisible(true);
-    this.jadBusy = false;
+    this.clearAir();
     this.hud('showBanner', ['boss.roundClear', { n: this.round }], null, 1100, '#FFD24A');
     this.jad.beaten();
     this.hud('setJadugarMood', 'angry');
-    this.dodoHp = Math.min(DODO_MAX, this.dodoHp + HEAL);
-    this.hud('setDodoHp', this.dodoHp / DODO_MAX);
+    if (this.hearts < HEARTS) {
+      this.hearts++; // one heart back between the rounds
+      this.hud('setHearts', this.hearts);
+    }
     this.combo = 0;
     this.hud('setCombo', 0);
-    this.jadMove.x = 640;
-    this.jadMove.y = 470;
-    this.time.delayedCall(2800, () => this.startRound(this.round + 1));
+    this.time.delayedCall(2600, () => this.startRound(this.round + 1));
   }
 
-  clearAttacks() {
-    Object.values(this.attacks).forEach((a) => a.clear());
-    this.bugsLeft = 0;
-    this.bugs.forEach((b) => b.setVisible(false));
-    this.shield.on = false;
-    this.shieldImage.setVisible(false);
-    this.shieldFlash.setVisible(false);
-    this.jad.bodyGroup.setScale(1);
+  clearAir() {
+    this.air.forEach((a) => {
+      this.tweens.killTweensOf(a);
+      a.free();
+    });
+    this.beam.setVisible(false);
+    this.wall.setVisible(false);
+    this.wallGlow.setVisible(false);
+    this.scrollFx.setVisible(false);
+    this.lockFx.setVisible(false);
+    this.stamp.setVisible(false);
+    this.hud('setGlow', 0);
+  }
+
+  // ---------- Attacks ----------
+
+  airborne() {
+    return this.air.filter((a) => a.state === 'flying');
+  }
+
+  busy() {
+    return this.air.filter((a) => a.state !== 'idle').length;
+  }
+
+  // the Jadugar chooses and throws the next attack (BossBrain: 85% exploit, 15% explore)
+  throwAttack() {
+    const free = this.air.find((a) => a.state === 'idle');
+    if (!free) return;
+    const b = this.bossBrain;
+    const inAir = this.air.filter((a) => a.state !== 'idle').map((a) => a.id);
+    const id = b.choose(this.round, inAir);
+    b.recordThrown(id);
+    // when he uses a weak spot of the player he says so
+    if (b.isExploiting(id) && this.tauntCd <= 0) this.taunt(id);
+    const hand = { x: this.jad.x - 120, y: this.jad.y - 270 };
+    free.launch(id, hand, this.dodoChest, SECONDS[this.round]);
+    this.jad.point(this.dodo.x, this.dodo.feetY - 200);
+    playSfx(this, 'sfx-attack-fly');
+    // round 1 teaches: the first time an attack comes, Mithu says the button and it glows
+    if (this.round === 1 && !this.hints[id]) {
+      this.hints[id] = true;
+      this.say(`mithu.boss.hint.${id}`);
+    }
+    if (this.round === 1) this.hud('setGlow', BOSS_ATTACKS[id]);
+  }
+
+  taunt(id) {
+    this.tauntCd = 9;
+    setSource(this.tauntText, `boss.taunt.${id}`);
+    this.tauntBox.setVisible(true).setScale(0).setAlpha(1);
+    this.tweens.add({ targets: this.tauntBox, scale: 1, duration: 260, ease: 'Back.Out' });
+    this.tweens.add({ targets: this.tauntBox, alpha: 0, delay: 2400, duration: 300, onComplete: () => this.tauntBox.setVisible(false) });
+    this.jad.laugh();
+    this.hud('setJadugarMood', 'laugh');
+  }
+
+  // ---------- Dodo's answer (keys 1-4 or the buttons) ----------
+
+  defend(n) {
+    if (this.state !== 'fight' && this.state !== 'finale') return;
+    this.hud('pressFlash', n);
+    playSfx(this, 'sfx-defence-press');
+    if (this.state === 'finale') {
+      this.finaleAnswer(n);
+      return;
+    }
+    // the attack that lands first is answered first
+    const air = this.airborne().sort((a, b) => a.remaining - b.remaining);
+    if (!air.length) return; // nothing to answer: no penalty
+    const match = air.find((a) => a.def === n);
+    if (match) this.defended(match, n);
+    else this.hurtDodo(air[0], 'wrong', n);
+  }
+
+  // the right defence: a flashy animation, then the attack flies back and hurts the Jadugar
+  defended(a, n) {
+    a.state = 'defending';
+    a.hideRing();
+    this.dodo.defend();
+    this.hud('setGlow', 0);
+    playSfx(this, n === 1 ? 'sfx-defend-lantern' : n === 2 ? 'sfx-defend-shield' : n === 3 ? 'sfx-defend-scroll' : 'sfx-defend-code');
+    const done = () => this.bounceBack(a);
+    if (n === 1) this.fxLantern(a, done);
+    else if (n === 2) this.fxPassword(a, done);
+    else if (n === 3) this.fxBackup(a, done);
+    else this.fxCode(a, done);
+  }
+
+  // 1: the lantern beam reveals the attack and burns it
+  fxLantern(a, done) {
+    const from = this.dodo.hand;
+    const dx = a.x - from.x;
+    const dy = a.y - from.y;
+    this.beam.setPosition(from.x, from.y).setRotation(Math.atan2(dy, dx)).setScale(Math.hypot(dx, dy) / 420, 1.5).setAlpha(0).setVisible(true);
+    this.tweens.add({ targets: this.beam, alpha: 0.95, duration: 120, yoyo: true, hold: 260, onComplete: () => this.beam.setVisible(false) });
+    const pic = a.pictures[a.id];
+    if (pic.setTint) {
+      pic.setTint(0xfff0a0);
+      this.time.delayedCall(220, () => pic.setTint(0xff8a3a));
+    }
+    if (a.id === 'trojan') this.time.delayedCall(200, () => pic.setTexture('gift-ghost'));
+    for (let i = 0; i < 4; i++) this.time.delayedCall(i * 90, () => this.fx.sparkle(a.x + Phaser.Math.Between(-50, 50), a.y + Phaser.Math.Between(-40, 40)));
+    this.time.delayedCall(620, done);
+  }
+
+  // 2: a glowing Ajrak password wall stops the hammer
+  fxPassword(a, done) {
+    const x = this.dodo.x + 220;
+    this.wall.setPosition(x, FEET_Y + 14).setScale(0.3, 2.6).setAlpha(1).setVisible(true);
+    this.wallGlow.setPosition(x, FEET_Y - 190).setAlpha(0.8).setVisible(true);
+    this.tweens.add({ targets: this.wall, scaleX: 2.4, duration: 220, ease: 'Back.Out' });
+    this.tweens.add({ targets: a, x: x + 36, y: FEET_Y - 200, duration: 230, ease: 'Cubic.In' });
+    this.time.delayedCall(240, () => {
+      this.impact(60, 0.004);
+      for (let i = 0; i < 5; i++) this.fx.sparkle(x + Phaser.Math.Between(-30, 50), FEET_Y - 200 + Phaser.Math.Between(-70, 70));
+      this.tweens.add({ targets: this.wallGlow, alpha: 1.2, scale: 1.4, duration: 120, yoyo: true });
+    });
+    this.time.delayedCall(560, () => {
+      this.tweens.add({ targets: [this.wall, this.wallGlow], alpha: 0, duration: 200, onComplete: () => {
+        this.wall.setVisible(false);
+        this.wallGlow.setVisible(false);
+      } });
+      done();
+    });
+  }
+
+  // 3: the Backup Scroll flies to the chain, the chain shatters
+  fxBackup(a, done) {
+    const from = this.dodo.hand;
+    this.scrollFx.setPosition(from.x, from.y).setScale(3).setAlpha(1).setVisible(true).setAngle(0);
+    this.tweens.add({ targets: this.scrollFx, x: a.x, y: a.y, angle: 360, duration: 320, ease: 'Sine.InOut', onComplete: () => {
+      this.scrollFx.setVisible(false);
+      for (let i = 0; i < 7; i++) this.fx.sparkle(a.x + Phaser.Math.Between(-60, 60), a.y + Phaser.Math.Between(-60, 60));
+      this.tweens.add({ targets: a, scaleX: a.scaleX * 1.25, scaleY: a.scaleY * 1.25, duration: 120, yoyo: true });
+      playSfx(this, 'sfx-chain-lock');
+    } });
+    this.time.delayedCall(700, done);
+  }
+
+  // 4: the code word lock opens and shows that the Mithu is FAKE
+  fxCode(a, done) {
+    this.lockFx.setPosition(a.x, a.y - 10).setScale(0.5).setAlpha(1).setVisible(true);
+    this.tweens.add({ targets: this.lockFx, scale: 4, duration: 260, ease: 'Back.Out' });
+    this.time.delayedCall(300, () => {
+      this.stamp.setPosition(a.x, a.y + 10).setAngle(-12).setScale(2).setAlpha(1).setVisible(true);
+      this.tweens.add({ targets: this.stamp, scale: 1, duration: 220, ease: 'Back.Out' });
+      a.pictures.deepfake.fakeBird.setScale(1.2 * 0.7);
+      this.impact(60, 0.004);
+    });
+    this.time.delayedCall(850, () => {
+      this.lockFx.setVisible(false);
+      this.stamp.setVisible(false);
+      done();
+    });
+  }
+
+  // the attack flies back to the Jadugar (a bounce)
+  bounceBack(a) {
+    a.state = 'returning';
+    playSfx(this, 'sfx-bounce');
+    const target = this.jadBody;
+    this.tweens.add({
+      targets: a,
+      x: target.x,
+      y: target.y,
+      scaleX: 0.6,
+      scaleY: 0.6,
+      angle: a.angle + 360,
+      duration: 460,
+      ease: 'Cubic.In',
+      onComplete: () => {
+        a.free();
+        this.hitJadugar();
+      },
+    });
+  }
+
+  hitJadugar() {
+    if (this.state !== 'fight') return;
+    this.hits++;
+    this.hud('setBossHp', (TOTAL_HITS - this.hits) / TOTAL_HITS);
+    this.jad.beaten();
+    this.hud('setJadugarMood', 'angry');
+    this.impact(90, 0.007);
+    playSfx(this, 'sfx-hit');
+    const body = this.jadBody;
+    for (let i = 0; i < 6; i++) this.fx.sparkle(body.x + Phaser.Math.Between(-80, 80), body.y + Phaser.Math.Between(-90, 70));
+    this.tweens.add({ targets: this.jad, x: JAD_X + 24, duration: 90, yoyo: true, ease: 'Sine.Out' });
+    this.combo++;
+    this.comboTimer = 6;
+    this.hud('setCombo', this.combo);
+    if (this.combo % 3 === 0) playSfx(this, 'sfx-combo');
+    this.spawnIn = GAP[this.round];
+    if (this.round < 3 && this.hits >= ROUND_END_HITS[this.round]) this.endRound();
+    else if (this.round === 3 && this.hits >= FINALE_HITS) this.startFinale();
+  }
+
+  // a wrong answer (reason 'wrong') or no answer in time (reason 'late'): the attack hits Dodo
+  hurtDodo(a, reason, pressed = 0) {
+    if (a.state !== 'flying') return;
+    a.state = 'returning';
+    a.hideRing();
+    this.hud('setGlow', 0);
+    if (pressed) this.hud('markWrong', pressed);
+    this.bossBrain.recordWrong(a.id);
+    this.wrongLog[a.id] = (this.wrongLog[a.id] || 0) + 1;
+    const hit = this.dodoChest;
+    this.tweens.add({
+      targets: a,
+      x: hit.x,
+      y: hit.y,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 160,
+      ease: 'Quad.In',
+      onComplete: () => {
+        a.free();
+        this.dodoHit(a.id);
+      },
+    });
+  }
+
+  dodoHit(id) {
+    if (this.state !== 'fight' && this.state !== 'finale') return;
+    this.hearts--;
+    this.hud('setHearts', this.hearts);
+    this.dodo.hit();
+    this.impact(80, 0.007);
+    if (!settings.low && !settings.reduced) this.cameras.main.flash(90, 255, 70, 70);
+    playSfx(this, 'sfx-heart-lost');
+    this.fx.puff(this.dodo.x + 80, FEET_Y - 180, 1);
+    this.hud('setJadugarMood', 'laugh');
+    this.jad.laugh();
+    this.combo = 0;
+    this.hud('setCombo', 0);
+    this.spawnIn = GAP[this.round] + 0.8;
+    // Mithu says, in one short line, what the right defence was and why
+    this.say(`mithu.boss.fix.${id}`);
+    if (this.hearts <= 0) this.lose();
+  }
+
+  // ---------- The finale: the Jadugar becomes a fake Mithu and asks for the key ----------
+
+  startFinale() {
+    this.state = 'finale';
+    this.cutscene = true;
+    this.clearAir();
+    this.hud('showBanner', ['boss.finale'], null, 1100, '#B48CFF');
+    const body = this.jadBody;
+    this.swirl(body.x, body.y);
+    this.tweens.add({ targets: this.jad, alpha: 0, duration: 260 });
+    this.time.delayedCall(420, () => {
+      this.face = this.air[0];
+      this.face.launch('deepfake', { x: JAD_X - 60, y: 330 }, { x: JAD_X - 60, y: 330 }, FINALE_SECONDS);
+      this.face.setPosition(JAD_X - 60, 330).setScale(1.5);
+      this.face.state = 'finale';
+      this.faceTime = 0;
+      this.cutscene = false;
+      this.say('mithu.boss.finale');
+      this.hud('setGlow', 4);
+      playSfx(this, 'sfx-deepfake');
+    });
+  }
+
+  finaleAnswer(n) {
+    const face = this.face;
+    if (!face || face.state !== 'finale') return;
+    if (n === 4) {
+      face.state = 'defending';
+      face.hideRing();
+      this.hud('setGlow', 0);
+      this.dodo.defend();
+      playSfx(this, 'sfx-defend-code');
+      this.fxCode(face, () => {
+        // the fake melts, the real Jadugar is there again: the last hit
+        this.tweens.add({ targets: face, scaleY: 0, alpha: 0, duration: 400, onComplete: () => face.free() });
+        this.fx.smoke(face.x, face.y);
+        this.jad.setAlpha(1);
+        this.swirl(this.jadBody.x, this.jadBody.y);
+        this.time.delayedCall(500, () => {
+          this.hits = TOTAL_HITS;
+          this.hud('setBossHp', 0);
+          this.ko();
+        });
+      });
+    } else {
+      this.bossBrain.recordWrong('deepfake');
+      this.wrongLog.deepfake = (this.wrongLog.deepfake || 0) + 1;
+      this.hud('markWrong', n);
+      this.faceTime = 0;
+      this.dodoHit('deepfake');
+    }
   }
 
   // ---------- Finish ----------
 
   lose() {
+    if (this.state === 'lose') return;
     this.state = 'lose';
     this.cutscene = true;
-    this.clearAttacks();
-    this.deepfake.clear();
-    this.player.inputLocked = true;
-    const top = this.topHit();
-    this.hud('showLose', top ? `boss.tip.${top}` : 'boss.tip.none');
+    this.clearAir();
+    if (this.face) this.face.free();
+    this.dodo.slump();
+    this.hud('setGlow', 0);
+    const worst = this.bossBrain.worst(this.wrongLog);
+    this.hud('showLose', worst ? `boss.tip.${worst}` : 'boss.tip.none');
     saveResult('miri', 0); // one point for the AI Hacker in "Humans vs AI"
     this.saveFightMemory();
   }
 
-  // the attack that hit Dodo most in this fight
-  topHit() {
-    let best = null;
-    Object.keys(this.hitLog).forEach((n) => {
-      if (this.hitLog[n] > 0 && (!best || this.hitLog[n] > this.hitLog[best])) best = n;
-    });
-    return best;
-  }
-
   // what the boss learned: kept for the certificate
   saveFightMemory() {
-    const top = this.topHit();
-    const total = Object.values(this.hitLog).reduce((a, b) => a + b, 0);
-    saveBoss({ attacks: JSON.parse(JSON.stringify(this.bossBrain.stats)), top, hits: top ? this.hitLog[top] : 0, total });
+    const worst = this.bossBrain.worst(this.wrongLog);
+    const total = ATTACK_IDS.reduce((sum, id) => sum + (this.wrongLog[id] || 0), 0);
+    saveBoss({ attacks: JSON.parse(JSON.stringify(this.bossBrain.stats)), top: worst, hits: worst ? this.wrongLog[worst] : 0, total });
   }
 
   // K.O.: slow motion, then the win party
   ko() {
     this.state = 'ko';
     this.cutscene = true;
-    this.clearAttacks();
-    this.deepfake.clear();
-    this.player.inputLocked = true;
+    this.clearAir();
     this.hud('showBanner', ['boss.ko'], null, 1500, '#FF5A4A');
     playSfx(this, 'sfx-ko');
     this.impact(260, 0.012);
@@ -521,16 +612,14 @@ export default class BossScene extends Phaser.Scene {
   winSequence() {
     this.state = 'won';
     const jad = this.jad;
-    this.jadHoverTarget = 0;
     this.say('mithu.boss.ko');
-    this.tweens.add({ targets: jad, scale: 0.28, duration: 1100, ease: 'Back.In' });
-    this.tweens.add({ targets: this.jadShadow, scaleX: 0.7, scaleY: 0.3, duration: 1100 });
-    for (let i = 0; i < 6; i++) this.time.delayedCall(i * 160, () => this.fx.smoke(jad.x + Phaser.Math.Between(-50, 50), jad.y - 60));
+    this.dodo.celebrate();
+    this.tweens.add({ targets: jad, scale: 0.4, duration: 1100, ease: 'Back.In' });
+    for (let i = 0; i < 6; i++) this.time.delayedCall(i * 160, () => this.fx.smoke(jad.x + Phaser.Math.Between(-90, 90), jad.y - 140));
     this.time.delayedCall(1100, () => {
       this.fx.smoke(jad.x, jad.y - 20);
       jad.setAlpha(0.9);
     });
-    // the fort lights up
     this.tweens.add({ targets: this.arenaShade, alpha: 0, duration: 1200 });
     this.arenaGlow.setVisible(true);
     this.tweens.add({ targets: this.arenaGlow, alpha: 0.55, duration: 1400 });
@@ -540,10 +629,9 @@ export default class BossScene extends Phaser.Scene {
     this.time.delayedCall(5600, () => this.finishWin());
   }
 
-  // 3 stars: Dodo has most health left. 2 stars: some. 1 star: he barely won.
+  // 3 stars: four or five hearts left. 2 stars: two or three. 1 star: he barely won.
   computeStars() {
-    const left = this.dodoHp / DODO_MAX;
-    return left >= 0.6 ? 3 : left >= 0.3 ? 2 : 1;
+    return this.hearts >= 4 ? 3 : this.hearts >= 2 ? 2 : 1;
   }
 
   finishWin() {
@@ -553,7 +641,7 @@ export default class BossScene extends Phaser.Scene {
     saveSnapshot(this.game, this);
     this.scene.stop('BossUI');
     this.cameras.main.fadeOut(600, 11, 13, 26);
-    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('Report', { stars, bossStars: Math.max(stars, getStars('miri')) }));
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('Report', { stars }));
   }
 
   // ---------- Update ----------
@@ -565,264 +653,86 @@ export default class BossScene extends Phaser.Scene {
       if (this.slowTimer <= 0) this.endSlowMotion();
     }
     let dt = raw * this.slow;
-    let step = delta * this.slow;
     if (this.hitStopLeft > 0) {
       this.hitStopLeft -= raw;
       dt = 0;
-      step = 0;
     }
-    const p = this.player;
 
-    if (p.hurtTimer > 0) p.hurtTimer -= dt;
-    p.update(time, step);
-    p.setAlpha(p.hurtTimer > 0 && Math.sin(time / 45) > 0 ? 0.45 : 1);
-    this.lantern.update(dt, []);
-    if (this.mithu.visible) this.mithu.update(dt);
+    this.dodo.update(dt);
+    this.jad.update(dt);
+    this.jad.setDepth(FEET_Y);
+    this.updateMithu(dt);
     this.fx.update(dt);
     this.arena.update(time);
     this.party.update(dt);
-    this.updateJadugar(dt);
-    this.updateShield(dt);
 
-    if (this.state === 'fight') {
-      this.updateBeam(dt);
-      this.updateAttacks(dt);
-      this.updateBugs(dt);
-      if (this.tauntCd > 0) this.tauntCd -= dt;
-      if (this.comboTimer > 0) {
-        this.comboTimer -= dt;
-        if (this.comboTimer <= 0) {
-          this.combo = 0;
-          this.hud('setCombo', 0);
-        }
+    if (this.state === 'fight') this.updateFight(dt);
+    else if (this.state === 'finale') this.updateFinale(dt);
+    this.updateKeys();
+    if (this.tauntCd > 0) this.tauntCd -= dt;
+  }
+
+  updateMithu(dt) {
+    this.anchor.y = FEET_Y - 250 + Math.sin(this.time.now / 700) * 6;
+    this.mithu.update(dt);
+    this.bubble.follow(this.mithu.x, this.mithu.y - 56);
+  }
+
+  updateFight(dt) {
+    // the attacks in the air: they fly, and when the ring is empty they hit Dodo
+    for (const a of this.air) {
+      if (a.state === 'flying' && a.step(dt)) this.hurtDodo(a, 'late');
+    }
+    if (this.comboTimer > 0) {
+      this.comboTimer -= dt;
+      if (this.comboTimer <= 0) {
+        this.combo = 0;
+        this.hud('setCombo', 0);
       }
     }
-    this.deepfake.update(dt);
-    this.updatePrompt();
-
-    // Mithu hides during the deepfake trick: his words then come from above Dodo
-    if (this.mithu.visible) this.bubble.follow(this.mithu.x, this.mithu.y - 52);
-    else this.bubble.follow(p.x, p.y - 230);
+    // the next attack
+    this.spawnIn -= dt;
+    if (this.spawnIn > 0 || this.busy() >= MAX_AIR[this.round]) return;
+    const air = this.airborne();
+    // in round 3 a second attack waits until the first one has been in the air for a moment
+    if (air.length && air[0].t < 1.2) return;
+    this.throwAttack();
+    this.spawnIn = GAP[this.round];
   }
 
-  // The Jadugar floats around the arena and teleports with a purple swirl.
-  updateJadugar(dt) {
-    const jad = this.jad;
-    const m = this.jadMove;
-    const g = this.jadGround;
-    if (this.stunLeft > 0) this.stunLeft -= dt;
-    const free = this.state === 'fight' && !this.jadBusy && this.stunLeft <= 0 && !this.deepfake.active;
-    if (free) {
-      m.wait -= dt;
-      if (m.wait <= 0) {
-        m.wait = Phaser.Math.FloatBetween(1.4, 2.6);
-        m.x = Phaser.Math.Between(ARENA.jadMinX, ARENA.jadMaxX);
-        m.y = Phaser.Math.Between(ARENA.jadMinY, ARENA.jadMaxY);
-      }
-      this.teleportIn -= dt;
-      if (this.teleportIn <= 0 && !this.slam.active && !this.gifts.active) {
-        this.teleportIn = Phaser.Math.FloatBetween(5, 8);
-        this.teleport();
-      }
-    }
-    // drift towards the wanted spot (slower while attacking)
-    const speed = this.slam.active || this.gifts.active ? 0 : 2.2;
-    g.x += (m.x - g.x) * Math.min(1, dt * speed);
-    g.y += (m.y - g.y) * Math.min(1, dt * speed);
-    this.jadHover += (this.jadHoverTarget - this.jadHover) * Math.min(1, dt * 8);
-    const bob = this.jadHoverTarget > 0 ? Math.sin(this.time.now / 380) * 7 : 0;
-    jad.setPosition(g.x, g.y - this.jadHover - bob);
-    jad.update(dt);
-    jad.setDepth(g.y + 2);
-    this.jadShadow.setPosition(g.x, g.y + 6).setDepth(g.y - 1).setAlpha(0.55 - Math.min(0.3, this.jadHover / 220));
-    if (this.jadShield.on) {
-      const pulse = 0.55 + Math.sin(this.time.now / 90) * 0.12;
-      this.shieldGlow.setPosition(jad.x, jad.y - 110).setAlpha(pulse * 0.7).setDepth(g.y + 3);
-      this.shieldRing.setPosition(jad.x, jad.y - 110).setAlpha(pulse).setDepth(g.y + 3);
+  // the fake Mithu waits for the code word. Too late = a heart, and he asks again.
+  updateFinale(dt) {
+    const face = this.face;
+    if (!face || face.state !== 'finale') return;
+    this.faceTime += dt;
+    face.t = this.faceTime;
+    face.setY(330 + Math.sin(this.faceTime * 3) * 8);
+    face.drawRing(Math.max(0, 1 - this.faceTime / FINALE_SECONDS));
+    if (this.faceTime >= FINALE_SECONDS) {
+      this.faceTime = 0;
+      this.bossBrain.recordWrong('deepfake');
+      this.wrongLog.deepfake = (this.wrongLog.deepfake || 0) + 1;
+      this.dodoHit('deepfake');
     }
   }
 
-  teleport() {
-    const g = this.jadGround;
-    const p = this.player;
-    this.jadBusy = true;
-    this.swirl(g.x, g.y - this.jadHover - 40);
-    this.tweens.add({ targets: this.jad, alpha: 0, duration: 220 });
-    this.time.delayedCall(260, () => {
-      if (this.state !== 'fight') {
-        this.jad.setAlpha(1);
-        this.jadBusy = false;
-        return;
-      }
-      let x = Phaser.Math.Between(ARENA.jadMinX, ARENA.jadMaxX);
-      let y = Phaser.Math.Between(ARENA.jadMinY, ARENA.jadMaxY);
-      if (Phaser.Math.Distance.Between(x, y, p.x, p.y) < 220) x = x < 640 ? ARENA.jadMaxX : ARENA.jadMinX;
-      g.x = x;
-      g.y = y;
-      this.jadMove.x = x;
-      this.jadMove.y = y;
-      this.swirl(x, y - this.jadHover - 40);
-      this.tweens.add({ targets: this.jad, alpha: 1, duration: 260 });
-      this.time.delayedCall(280, () => {
-        this.jadBusy = false;
-        // sometimes he comes back with a purple shield (the lantern breaks it)
-        if (!this.deepfake.active && Math.random() < (this.round === 1 ? 0.25 : 0.45)) this.raiseJadShield();
-      });
-    });
-  }
-
-  raiseJadShield() {
-    this.jadShield.on = true;
-    this.jadShield.hp = 1;
-    this.shieldGlow.setVisible(true);
-    this.shieldRing.setVisible(true);
-  }
-
-  clearJadShield() {
-    this.jadShield.on = false;
-    this.shieldGlow.setVisible(false);
-    this.shieldRing.setVisible(false);
-  }
-
-  // the lantern beam on the Jadugar: breaks his shield, then deals steady damage
-  updateBeam(dt) {
-    if (this.jadBusy && !this.slam.active) return; // teleporting: cannot be hit
-    if (!this.jad.visible || this.deepfake.active) return;
-    const body = this.jadBody;
-    if (!this.inBeam(body.x, body.y, 62)) {
-      this.beamTick = 0;
-      return;
-    }
-    if (this.jadShield.on) {
-      this.jadShield.hp -= dt / 0.9;
-      this.fx.sparkle(body.x + Phaser.Math.Between(-50, 50), body.y + Phaser.Math.Between(-60, 60));
-      if (this.jadShield.hp <= 0) {
-        this.clearJadShield();
-        this.jad.beaten();
-        this.hud('setJadugarMood', 'angry');
-        this.impact(80, 0.006);
-        playSfx(this, 'sfx-shield');
-        for (let i = 0; i < 4; i++) this.fx.sparkle(body.x + Phaser.Math.Between(-60, 60), body.y + Phaser.Math.Between(-60, 60));
-      }
-      return;
-    }
-    if (this.stunLeft > 0 && this.stunLeft < 0.1) return;
-    this.damageBoss(BEAM_DPS * dt);
-    this.beamTick += dt;
-    if (this.beamTick >= 0.25) {
-      this.beamTick = 0;
-      this.comboHit();
-      this.fx.sparkle(body.x + Phaser.Math.Between(-40, 40), body.y + Phaser.Math.Between(-50, 30));
-      playSfx(this, 'sfx-beam-hit');
-      this.jad.beaten();
-    }
-  }
-
-  // the Jadugar's attacks: telegraphed, and never more than two at once
-  updateAttacks(dt) {
-    this.letters.update(dt);
-    this.slam.update(dt);
-    this.gifts.update(dt);
-    if (this.deepfakeCd > 0) this.deepfakeCd -= dt;
-    if (this.jadBusy || this.stunLeft > 0 || this.deepfake.active) return;
-    this.nextAttackIn -= dt;
-    if (this.nextAttackIn > 0) return;
-    if (this.activeAttacks() >= 2) {
-      this.nextAttackIn = 0.3;
-      return;
-    }
-    const name = this.pickAttack();
-    if (!name) {
-      this.nextAttackIn = 0.4;
-      return;
-    }
-    this.startAttack(name);
-    const base = [0, 2.3, 1.9, 1.5][this.round];
-    this.nextAttackIn = base + Math.random() * 0.8;
-  }
-
-  updateBugs(dt) {
-    const p = this.player;
-    if (this.bugsLeft <= 0) {
-      this.bugs.forEach((b) => b.setVisible(false));
-      return;
-    }
-    this.bugsLeft -= dt;
-    this.bugTick -= dt;
-    if (this.bugTick <= 0) {
-      this.bugTick = 1;
-      this.dodoHp = Math.max(0, this.dodoHp - 4);
-      this.hud('setDodoHp', this.dodoHp / DODO_MAX);
-      p.pulse(1.1, 0.92);
-      if (this.dodoHp <= 0) {
-        this.lose();
-        return;
-      }
-    }
-    this.bugs.forEach((b, i) => {
-      const a = this.time.now / 160 + (i * Math.PI * 2) / 3;
-      b.setVisible(true).setPosition(p.x + Math.cos(a) * 46, p.y - 60 - Math.sin(a) * 30).setDepth(p.y + 5);
-    });
-  }
-
-  // ---------- Firewall Shield (E) ----------
-
-  updateShield(dt) {
-    const s = this.shield;
-    const p = this.player;
-    if (s.cd > 0) s.cd = Math.max(0, s.cd - dt);
-    this.hud('setShield', s.on ? 0 : 1 - s.cd / SHIELD_COOLDOWN);
-    if (s.on) {
-      s.t -= dt;
-      const x = p.x + p.facingDir * 78;
-      this.shieldImage.setPosition(x, p.y + 8).setDepth(p.y + 4).setAlpha(Math.min(1, s.t / 0.25 + 0.2));
-      this.shieldFlash.setPosition(x, p.y - 80).setDepth(p.y + 3.9).setAlpha(0.55 + Math.sin(this.time.now / 60) * 0.12);
-      if (s.t <= 0) {
-        s.on = false;
-        s.cd = SHIELD_COOLDOWN; // the 4 second cooldown starts when the shield ends
-        this.shieldImage.setVisible(false);
-        this.shieldFlash.setVisible(false);
-      }
-    }
-  }
-
-  raiseShield() {
-    const s = this.shield;
-    if (s.on || s.cd > 0 || this.state !== 'fight' || this.player.inputLocked) return;
-    s.on = true;
-    s.t = SHIELD_TIME;
-    this.shieldImage.setVisible(true).setScale(0.4, 1);
-    this.tweens.add({ targets: this.shieldImage, scaleX: 1, duration: 180, ease: 'Back.Out' });
-    this.shieldFlash.setVisible(true);
-    this.player.pulse(1.1, 0.92);
-    playSfx(this, 'sfx-shield');
-  }
-
-  // E: the code word question (deepfake trick) comes first, otherwise the shield
-  updatePrompt() {
-    const pressed = Phaser.Input.Keyboard.JustDown(this.useKey);
-    const label = this.deepfake.prompt();
-    if (label) {
-      const c = this.deepfake.near;
-      this.eHint.show();
-      this.eHint.place(c.x, c.y - 300);
-      this.eHint.setAction(label);
-      if (pressed) this.deepfake.interact();
-      return;
-    }
-    this.eHint.hide();
-    if (pressed && this.state === 'fight') this.raiseShield();
+  updateKeys() {
+    const J = Phaser.Input.Keyboard.JustDown;
+    const k = this.keys;
+    if (J(k.one) || J(k.n1)) this.defend(1);
+    if (J(k.two) || J(k.n2)) this.defend(2);
+    if (J(k.three) || J(k.n3)) this.defend(3);
+    if (J(k.four) || J(k.n4)) this.defend(4);
   }
 
   // ---------- Developers only ----------
-  // K = hit the boss for 40   J = hurt Dodo for 30   N = next round   (console: window.__boss)
+  // K = hit the boss   J = hurt Dodo   (console: window.__boss)
   setupDebug() {
     window.__boss = this;
-    this.input.keyboard.on('keydown-K', () => this.damageBoss(40));
+    this.input.keyboard.on('keydown-K', () => this.state === 'fight' && this.hitJadugar());
     this.input.keyboard.on('keydown-J', () => {
-      this.player.hurtTimer = 0;
-      this.hurtDodo(30, 'hathoda');
+      const a = this.airborne()[0];
+      if (a) this.hurtDodo(a, 'late');
     });
-    this.input.keyboard.on('keydown-I', () => console.table(this.bossBrain.stats));
   }
 }

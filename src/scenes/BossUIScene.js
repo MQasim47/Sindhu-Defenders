@@ -2,20 +2,24 @@ import Phaser from 'phaser';
 import Button from '../ui/Button.js';
 import JadugarPortrait from '../ui/JadugarPortrait.js';
 import PauseMenu from '../ui/PauseMenu.js';
+import { DEFENCES, fit } from '../boss/showdownParts.js';
 import { addText, setSource } from '../i18n/i18nText.js';
 import { COLORS, CSS, FONT } from '../data/colors.js';
 import { newCanvas, INK } from '../fx/canvasUtil.js';
 import { fillAjrak } from '../fx/ajrakPattern.js';
+import { goToScene } from '../systems/sceneFlow.js';
 
 const BAR_W = 440;
 const BAR_H = 34;
 const DODO_BAR = { x: 176, y: 44 };
 const JAD_BAR = { x: 664, y: 44 };
+const HEARTS = 5;
+const BUTTON = { w: 292, h: 96, y: 654, gap: 12 };
 
-// The HUD of the boss fight (a fighting game screen). It runs next to BossScene.
-//   two big health bars with a delayed "ghost" bar, two portraits, the round counter,
-//   the combo counter, the shield cooldown ring, big banners (ROUND 1 - FIGHT!, K.O.!),
-//   the Jadugar's taunts and the "lose" card.
+// The HUD of the showdown (a fighting game screen). It runs next to BossScene.
+//   two big bars with a delayed "ghost" part (Dodo's bar has 5 hearts, the Jadugar's bar shows his health),
+//   two portraits, the round counter, the combo counter, big banners (ROUND 1 - FIGHT!, K.O.!),
+//   the 4 defence buttons (also keys 1-4) and the "lose" card.
 export default class BossUIScene extends Phaser.Scene {
   constructor() {
     super('BossUI');
@@ -29,11 +33,14 @@ export default class BossUIScene extends Phaser.Scene {
   create() {
     this.dodoHp = { value: 1, ghost: 1, hold: 0 };
     this.bossHp = { value: 1, ghost: 1, hold: 0 };
+    this.hearts = HEARTS;
+    this.glowing = 0;
     this.bars = this.add.graphics().setDepth(10);
 
     this.buildPortraits();
     this.buildTexts();
-    this.buildShieldIcon();
+    this.buildHearts();
+    this.buildButtons();
     this.drawBars();
 
     this.escKey = this.input.keyboard.addKey('ESC');
@@ -111,56 +118,61 @@ export default class BossUIScene extends Phaser.Scene {
   }
 
   buildTexts() {
-    const nameStyle = { fontFamily: FONT, fontSize: '26px', fontStyle: '700', color: CSS.cream, stroke: '#10143a', strokeThickness: 6 };
-    this.add.text(DODO_BAR.x, 92, 'DODO', { ...nameStyle, resolution: 2 }).setDepth(12);
-    this.add.text(JAD_BAR.x + BAR_W, 92, 'JADUGAR', { ...nameStyle, resolution: 2 }).setOrigin(1, 0).setDepth(12);
-
+    const nameStyle = { fontFamily: FONT, fontSize: '26px', fontStyle: '700', color: CSS.cream, stroke: '#10143a', strokeThickness: 6, resolution: 2 };
+    this.add.text(DODO_BAR.x, 92, 'DODO', nameStyle).setDepth(12);
+    this.add.text(JAD_BAR.x + BAR_W, 92, 'JADUGAR', nameStyle).setOrigin(1, 0).setDepth(12);
     this.roundText = addText(this, 640, 118, 'boss.round', { fontFamily: FONT, fontSize: '30px', fontStyle: '700', color: CSS.gold, stroke: '#10143a', strokeThickness: 6 }, { n: 1 }).setOrigin(0.5).setDepth(12);
-    this.comboText = addText(this, 176, 176, 'boss.combo', { fontFamily: FONT, fontSize: '44px', fontStyle: '700', color: '#FFD24A', stroke: '#8E1B2B', strokeThickness: 8 }, { n: 0 }).setOrigin(0, 0.5).setDepth(12).setVisible(false);
-    this.banner = addText(this, 640, 330, 'boss.fight', { fontFamily: FONT, fontSize: '120px', fontStyle: '700', color: CSS.cream, stroke: '#8E1B2B', strokeThickness: 16 }).setOrigin(0.5).setDepth(40).setVisible(false);
-    this.subBanner = addText(this, 640, 440, 'boss.fight', { fontFamily: FONT, fontSize: '70px', fontStyle: '700', color: '#FFD24A', stroke: '#10143a', strokeThickness: 12 }).setOrigin(0.5).setDepth(40).setVisible(false);
-
-    // the Jadugar's taunt (a small speech box under his portrait)
-    this.tauntBox = this.add.container(1050, 196).setDepth(30).setVisible(false);
-    const bg = this.add.graphics();
-    bg.fillStyle(0xfff6dc, 1);
-    bg.fillRoundedRect(-170, -30, 340, 60, 18);
-    bg.lineStyle(4, 0x3a1c16, 1);
-    bg.strokeRoundedRect(-170, -30, 340, 60, 18);
-    this.tauntText = addText(this, 0, 0, 'boss.taunt.switch', { fontFamily: FONT, fontSize: '22px', fontStyle: '700', color: CSS.ink, align: 'center', wordWrap: { width: 320 } }).setOrigin(0.5);
-    this.tauntBox.add([bg, this.tauntText]);
-
-    // controls hint at the start
-    const hint = addText(this, 640, 690, 'hud.controlsBoss', { fontFamily: FONT, fontSize: '22px', fontStyle: '500', color: CSS.cream, backgroundColor: 'rgba(11,13,26,0.6)', padding: { x: 14, y: 5 } })
-      .setOrigin(0.5)
-      .setDepth(12);
-    this.tweens.add({ targets: hint, alpha: 0, delay: 9000, duration: 800, onComplete: () => hint.destroy() });
+    this.comboText = addText(this, 176, 172, 'boss.combo', { fontFamily: FONT, fontSize: '44px', fontStyle: '700', color: '#FFD24A', stroke: '#8E1B2B', strokeThickness: 8 }, { n: 0 }).setOrigin(0, 0.5).setDepth(12).setVisible(false);
+    this.banner = addText(this, 640, 300, 'boss.fight', { fontFamily: FONT, fontSize: '120px', fontStyle: '700', color: CSS.cream, stroke: '#8E1B2B', strokeThickness: 16 }).setOrigin(0.5).setDepth(40).setVisible(false);
+    this.subBanner = addText(this, 640, 410, 'boss.fight', { fontFamily: FONT, fontSize: '70px', fontStyle: '700', color: '#FFD24A', stroke: '#10143a', strokeThickness: 12 }).setOrigin(0.5).setDepth(40).setVisible(false);
+    const hint = addText(this, 640, 578, 'hud.controlsBoss', { fontFamily: FONT, fontSize: '20px', fontStyle: '500', color: CSS.cream, backgroundColor: 'rgba(11,13,26,0.6)', padding: { x: 12, y: 4 } }).setOrigin(0.5).setDepth(12);
+    this.tweens.add({ targets: hint, alpha: 0, delay: 12000, duration: 800, onComplete: () => hint.destroy() });
   }
 
-  // the Firewall Shield icon (bottom left) with a ring that fills while it recharges
-  buildShieldIcon() {
-    this.shieldRing = this.add.graphics().setDepth(12);
-    this.shieldKey = this.add.text(70, 636, 'E', { fontFamily: FONT, fontSize: '34px', fontStyle: '700', color: CSS.cream, resolution: 2 }).setOrigin(0.5).setDepth(13);
-    addText(this, 70, 688, 'boss.shield', { fontFamily: FONT, fontSize: '20px', fontStyle: '600', color: CSS.cream, stroke: '#10143a', strokeThickness: 4 }).setOrigin(0.5).setDepth(13);
-    this.shieldFrac = 1;
-    this.drawShield(1);
+  // five hearts on Dodo's bar
+  buildHearts() {
+    this.heartImages = [];
+    for (let i = 0; i < HEARTS; i++) {
+      const x = DODO_BAR.x + (BAR_W / HEARTS) * (i + 0.5);
+      this.heartImages.push(this.add.image(x, DODO_BAR.y + BAR_H / 2, 'fx-heart').setScale(1.25).setDepth(14));
+    }
   }
 
-  drawShield(frac) {
-    const g = this.shieldRing;
-    g.clear();
-    g.fillStyle(0x1c2457, 0.9);
-    g.fillCircle(70, 636, 36);
-    g.lineStyle(7, 0x2a0e14, 1);
-    g.strokeCircle(70, 636, 36);
-    g.lineStyle(7, frac >= 1 ? 0xffd24a : 0x9a929e, 1);
-    g.beginPath();
-    g.arc(70, 636, 36, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac, false);
-    g.strokePath();
-    this.shieldKey.setAlpha(frac >= 1 ? 1 : 0.5);
+  // the four defence buttons: icon, number key, label. A glowing frame shows the right one (round 1).
+  buildButtons() {
+    const total = BUTTON.w * 4 + BUTTON.gap * 3;
+    this.buttons = DEFENCES.map((d, i) => {
+      const x = 640 - total / 2 + BUTTON.w / 2 + i * (BUTTON.w + BUTTON.gap);
+      const c = this.add.container(x, BUTTON.y).setDepth(30);
+      const g = this.add.graphics();
+      g.fillStyle(0x000000, 0.4);
+      g.fillRoundedRect(-BUTTON.w / 2, -BUTTON.h / 2 + 8, BUTTON.w, BUTTON.h, 24);
+      g.fillStyle(0x5a0f1d, 1);
+      g.fillRoundedRect(-BUTTON.w / 2 - 4, -BUTTON.h / 2 - 4, BUTTON.w + 8, BUTTON.h + 8, 26);
+      g.fillStyle(COLORS.cream, 1);
+      g.fillRoundedRect(-BUTTON.w / 2, -BUTTON.h / 2, BUTTON.w, BUTTON.h, 22);
+      g.fillStyle(COLORS.indigo, 1);
+      g.fillRoundedRect(-BUTTON.w / 2, -BUTTON.h / 2, 96, BUTTON.h, { tl: 22, tr: 0, bl: 22, br: 0 });
+      const icon = fit(this.add.image(-BUTTON.w / 2 + 48, 6, d.icon), 62);
+      const num = this.add.text(-BUTTON.w / 2 + 14, -BUTTON.h / 2 + 8, String(d.n), { fontFamily: FONT, fontSize: '30px', fontStyle: '700', color: CSS.gold, stroke: '#10143a', strokeThickness: 5, resolution: 2 });
+      const label = addText(this, 52, 0, d.label, { fontFamily: FONT, fontSize: '25px', fontStyle: '700', color: CSS.indigo, align: 'center', wordWrap: { width: 176 } }).setOrigin(0.5);
+      const glow = this.add.graphics().setVisible(false);
+      glow.lineStyle(8, 0xffd24a, 1);
+      glow.strokeRoundedRect(-BUTTON.w / 2 - 6, -BUTTON.h / 2 - 6, BUTTON.w + 12, BUTTON.h + 12, 28);
+      const flash = this.add.rectangle(0, 0, BUTTON.w, BUTTON.h, 0xffffff, 0).setOrigin(0.5);
+      c.add([g, icon, num, label, glow, flash]);
+      c.setSize(BUTTON.w, BUTTON.h).setInteractive({ useHandCursor: true });
+      c.on('pointerover', () => this.tweens.add({ targets: c, scale: 1.04, duration: 100 }));
+      c.on('pointerout', () => this.tweens.add({ targets: c, scale: 1, duration: 100 }));
+      c.on('pointerdown', () => this.levelScene.defend(d.n));
+      c.glow = glow;
+      c.flash = flash;
+      c.pulse = null;
+      return c;
+    });
   }
 
-  // ---------- Health bars ----------
+  // ---------- Bars ----------
 
   drawBar(g, bar, hp, mirror, colors) {
     const x = bar.x;
@@ -179,7 +191,6 @@ export default class BossUIScene extends Phaser.Scene {
     };
     part(hp.ghost, 0xfff2b0); // the delayed ghost bar (what was just lost)
     part(hp.value, colors(hp.value));
-    // shine
     g.fillStyle(0xffffff, 0.2);
     g.fillRoundedRect(x + 6, y + 4, BAR_W - 12, 8, 4);
     g.lineStyle(3, 0xe8b84a, 1);
@@ -189,20 +200,35 @@ export default class BossUIScene extends Phaser.Scene {
   drawBars() {
     const g = this.bars;
     g.clear();
-    this.drawBar(g, DODO_BAR, this.dodoHp, false, (v) => (v > 0.5 ? 0x3fcf6a : v > 0.25 ? 0xf2c230 : 0xe5453a));
+    this.drawBar(g, DODO_BAR, this.dodoHp, false, () => 0xe5453a);
+    // the five heart steps on Dodo's bar
+    g.lineStyle(3, 0x3a1c16, 0.9);
+    for (let i = 1; i < HEARTS; i++) {
+      const x = DODO_BAR.x + (BAR_W / HEARTS) * i;
+      g.beginPath();
+      g.moveTo(x, DODO_BAR.y + 2);
+      g.lineTo(x, DODO_BAR.y + BAR_H - 2);
+      g.strokePath();
+    }
     this.drawBar(g, JAD_BAR, this.bossHp, true, () => 0xb05cf0);
   }
 
-  // frac 0..1
-  setDodoHp(frac) {
-    const hit = frac < this.dodoHp.value;
-    this.dodoHp.value = Phaser.Math.Clamp(frac, 0, 1);
-    if (hit) {
-      this.dodoHp.hold = 0.5;
-      this.tweens.add({ targets: [this.dodoFace, this.dodoFrame], scale: { from: 1.15, to: 1 }, duration: 260, ease: 'Back.Out' });
-    } else this.dodoHp.ghost = Math.max(this.dodoHp.ghost, this.dodoHp.value);
+  // hearts left (0-5)
+  setHearts(n) {
+    const lost = n < this.hearts;
+    this.hearts = n;
+    const frac = n / HEARTS;
+    if (lost) this.dodoHp.hold = 0.5;
+    else this.dodoHp.ghost = Math.max(this.dodoHp.ghost, frac);
+    this.dodoHp.value = frac;
+    this.heartImages.forEach((h, i) => {
+      h.setTint(i < n ? 0xffffff : 0x4a3a44).setAlpha(i < n ? 1 : 0.6);
+      if (lost && i === n) this.tweens.add({ targets: h, scale: { from: 1.9, to: 1.25 }, duration: 320, ease: 'Back.Out' });
+    });
+    if (lost) this.tweens.add({ targets: [this.dodoFace, this.dodoFrame], scale: { from: 1.15, to: 1 }, duration: 260, ease: 'Back.Out' });
   }
 
+  // frac 0..1
   setBossHp(frac) {
     const hit = frac < this.bossHp.value;
     this.bossHp.value = Phaser.Math.Clamp(frac, 0, 1);
@@ -228,16 +254,38 @@ export default class BossUIScene extends Phaser.Scene {
     this.tweens.add({ targets: this.comboText, scale: 1, duration: 200, ease: 'Back.Out' });
   }
 
-  setShield(frac) {
-    if (frac === this.shieldFrac || (frac < 1 && Math.abs(frac - this.shieldFrac) < 0.01)) return;
-    const wasReady = this.shieldFrac >= 1;
-    this.shieldFrac = frac;
-    this.drawShield(frac);
-    if (frac >= 1 && !wasReady) this.tweens.add({ targets: this.shieldKey, scale: { from: 1.5, to: 1 }, duration: 260, ease: 'Back.Out' });
+  // the right button gently glows (0 = none)
+  setGlow(n) {
+    this.glowing = n;
+    this.buttons.forEach((b, i) => {
+      const on = i + 1 === n;
+      b.glow.setVisible(on);
+      if (b.pulse) {
+        b.pulse.stop();
+        b.pulse = null;
+        b.setScale(1);
+      }
+      if (on) b.pulse = this.tweens.add({ targets: b, scale: 1.06, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    });
+  }
+
+  pressFlash(n) {
+    const b = this.buttons[n - 1];
+    if (!b) return;
+    b.flash.setAlpha(0.7).setFillStyle(0xffffff);
+    this.tweens.add({ targets: b.flash, alpha: 0, duration: 220 });
+  }
+
+  // a wrong button: it flashes red
+  markWrong(n) {
+    const b = this.buttons[n - 1];
+    if (!b) return;
+    b.flash.setFillStyle(0xff3b3b).setAlpha(0.7);
+    this.tweens.add({ targets: b.flash, alpha: 0, duration: 420 });
+    this.tweens.add({ targets: b, x: b.x + 8, duration: 50, yoyo: true, repeat: 3 });
   }
 
   // a big text in the middle: "ROUND 1" then "FIGHT!", "K.O.!" ...
-  // main = [key, vars], sub = [key, vars] (optional). The text zooms in, stays, and fades.
   showBanner(main, sub, hold = 900, color = CSS.cream) {
     this.banner.setColor(color);
     setSource(this.banner, main[0], main[1]);
@@ -253,25 +301,15 @@ export default class BossUIScene extends Phaser.Scene {
     }
   }
 
-  // the Jadugar talks (the AI noticed something): his portrait laughs and a box shows the line
-  taunt(key, mood = 'laugh') {
-    this.portrait.setMood(mood, 2400);
-    setSource(this.tauntText, key);
-    this.tauntBox.setVisible(true).setScale(0);
-    this.tweens.killTweensOf(this.tauntBox);
-    this.tweens.add({ targets: this.tauntBox, scale: 1, duration: 260, ease: 'Back.Out' });
-    this.tweens.add({ targets: this.tauntBox, alpha: 0, delay: 2600, duration: 300, onComplete: () => this.tauntBox.setVisible(false).setAlpha(1) });
-  }
-
   setJadugarMood(mood) {
     this.portrait.setMood(mood);
   }
 
-  // Dodo lost: a card with one tip. tipKey = a key like 'boss.tip.hathoda'
+  // Dodo lost all hearts: a card with one tip. tipKey = a key like 'boss.tip.hammer'
   showLose(tipKey) {
     this.loseOpen = true;
     const blocker = this.add.rectangle(640, 360, 1280, 720, 0x0b0d1a, 0.75).setInteractive().setDepth(100);
-    const card = this.add.container(640, 360).setDepth(101);
+    const card = this.add.container(640, 340).setDepth(101);
     const w = 760;
     const h = 430;
     const g = this.add.graphics();
@@ -292,16 +330,16 @@ export default class BossUIScene extends Phaser.Scene {
     card.add(new Button(this, 170, h / 2 - 70, 'boss.menu', () => this.toMenu(), { width: 240, height: 74, fontSize: 30, style: 'indigo' }));
     card.setScale(0.6).setAlpha(0);
     this.tweens.add({ targets: card, scale: 1, alpha: 1, duration: 340, ease: 'Back.Out' });
-    this.loseObjects = [blocker, card];
   }
 
+  // try again: the fight starts at the round where Dodo lost
   retry() {
     const level = this.levelScene;
     level.scene.resume();
     level.cameras.main.fadeOut(300, 11, 13, 26);
     level.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.stop();
-      level.scene.restart();
+      level.scene.restart({ startRound: level.round, codeWord: level.codeWord });
     });
   }
 
@@ -311,7 +349,7 @@ export default class BossUIScene extends Phaser.Scene {
     level.cameras.main.fadeOut(400, 11, 13, 26);
     level.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.stop();
-      level.scene.start('Menu');
+      goToScene(level, 'Menu');
     });
   }
 
@@ -331,9 +369,8 @@ export default class BossUIScene extends Phaser.Scene {
         else hp.ghost = Math.max(hp.value, hp.ghost - dt * 0.35);
       }
     });
-    if (moved || this.barsDirty) this.drawBars();
+    if (moved || this.barsDirty || this.lastDodo !== this.dodoHp.value || this.lastBoss !== this.bossHp.value) this.drawBars();
     this.barsDirty = moved;
-    if (!moved && (this.lastDodo !== this.dodoHp.value || this.lastBoss !== this.bossHp.value)) this.drawBars();
     this.lastDodo = this.dodoHp.value;
     this.lastBoss = this.bossHp.value;
   }

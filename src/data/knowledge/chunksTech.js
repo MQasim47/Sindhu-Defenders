@@ -59,17 +59,7 @@ export const CHUNKS_TECH = [
   {
     id: 'tech-github',
     title: 'GitHub, Claude Code and how the game was built',
-    text: `The code lives on GitHub in the repository Sindhu-Defenders, with a commit for every step, so we can see the history and go back. Git is the version control program and GitHub is the website that stores the repository. We built the game in steps: setup and polish, villagers and lantern, the Jadugar AI, the chatbot, Level 2, then the boss and the world map. Claude Code, an AI coding assistant from Anthropic, helped write the code under the students' direction, and the project notes in CLAUDE.md keep the rules of the game, the style and the plan. The code is written in small files with simple comments so that students can read and explain it. Everything runs locally and offline after the build.`,
-  },
-  {
-    id: 'glossary-attacks',
-    title: 'Glossary: phishing, malware, virus, trojan, ransomware',
-    text: `Phishing is a trick message, email, call or person that pretends to be someone you trust to steal your information, like a fake bank SMS with a link. Malware is any bad software made to harm a device or steal data. A virus is malware that copies itself from file to file. A trojan is malware hidden inside something that looks useful or free, like a cracked game. Ransomware is malware that locks or encrypts your files and asks for money to open them; a backup is the best answer. Brute force is trying thousands of passwords one after another until one works. A hacker is a person who breaks into computers; a bad hacker is called a black hat and a good one who helps fix problems is a white hat. The "AI Hacker" in the game is a friendly training partner.`,
-  },
-  {
-    id: 'glossary-defence',
-    title: 'Glossary: password, backup, firewall, OTP, 2FA, deepfake, code word, AI',
-    text: `A password is a secret that protects an account: make it long, mixed, different for each account, and never share it. A backup is a spare copy of your files kept in a safe place. A firewall is a wall that checks and blocks bad traffic into a network; in the game the wall of Ranikot is the firewall. An OTP (one-time password) is a code sent to your phone that works once; never tell it to anyone, even if they say they are from the bank. 2FA (two-factor authentication) means you need two proofs to log in, for example a password plus an OTP, so a stolen password alone is not enough. A deepfake is a fake photo, video or voice made by AI that looks real; a voice clone copies a person's voice. A code word is a secret word that only your family knows to check who is real. AI (artificial intelligence) is a computer program that learns from data to make decisions.`,
+    text: `The code lives on GitHub in the repository Sindhu-Defenders, with a commit for every step, so we can see the history and go back. Git is the version control program and GitHub is the website that stores the repository. We built the game in steps: setup and polish, villagers and lantern, the Jadugar AI, the chatbot, Level 2, then the showdown boss, the world map, audio and the exhibition mode. Claude Code, an AI coding assistant from Anthropic, helped write the code under the students' direction, and the project notes in CLAUDE.md keep the rules of the game, the style and the plan. The code is written in small files with simple comments so that students can read and explain it. Everything runs locally and offline after the build.`,
   },
   {
     id: 'safety-kids',
@@ -89,6 +79,6 @@ export const CHUNKS_TECH = [
   {
     id: 'present-questions',
     title: 'Presentation help: likely judge questions and answers',
-    text: `Is the AI real? Yes: it records data, calculates a weakness score and decides what to send, and you can see its log; it is a small but real learning system. Why not a big AI like ChatGPT? A small local model is free, private and works offline on a school laptop. Is it only a game? The lessons are real: the same five habits protect real phones. What is original? The Sindhi setting, the adaptive hacker, the boss that remembers the earlier levels and the code word deepfake trick. What did you learn? How to use Phaser, JavaScript, git and AI ideas like exploit and explore, TF-IDF and RAG. What would you add? Shah-Pere Gate and Mohan Gate levels, Marvi as a playable hero, and sounds and music. Who helped? Teachers, free tools like Gemini, Photopea and Kenney, and Claude Code as a coding assistant.`,
+    text: `Is the AI real? Yes: it records data, calculates a weakness score and decides what to send, and you can see its log; it is a small but real learning system. Why not a big AI like ChatGPT? A small local model is free, private and works offline on a school laptop. Is it only a game? The lessons are real: the same five habits protect real phones. What is original? The Sindhi setting, the adaptive hacker, the boss that remembers the earlier levels and the code word deepfake trick. What did you learn? How to use Phaser, JavaScript, git and AI ideas like exploit and explore, TF-IDF and RAG. What would you add? Marvi as a playable hero and more levels about new dangers. Who helped? Teachers, free tools like Gemini, Photopea and Kenney, and Claude Code as a coding assistant.`,
   },
 ];

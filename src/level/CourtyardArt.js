@@ -1,7 +1,8 @@
 import { newCanvas } from '../fx/canvasUtil.js';
 import { WALK, START, GATE, CENTER, JADUGAR_SPOT, OBJECTS, PALMS } from './courtyardData.js';
 
-const SCALE = 1.0; // world pixels per pixel of the full-size picture
+const WORLD_WIDTH = 2752; // the courtyard is always this wide in the game, whatever size the picture file has
+let SCALE = 1; // world pixels per pixel of the picture file (set in buildCourtyardArt)
 const PIC = 2000; // width of the "measuring copy" used in courtyardData.js
 const pieceKeys = []; // textures of the cut-out pieces
 
@@ -21,6 +22,7 @@ export function buildCourtyardArt(scene) {
   const source = scene.textures.get('courtyard-bg').getSourceImage();
   if (!source || !source.width) return null;
 
+  SCALE = WORLD_WIDTH / source.width;
   const k = (source.width * SCALE) / PIC; // measuring copy -> world
   const world = { width: Math.round(source.width * SCALE), height: Math.round(source.height * SCALE) };
 

@@ -12,11 +12,20 @@ import { makeCanvasTexture } from '../fx/canvasUtil.js';
 // Generated art. Each texture uses the key the final PNG will use,
 // so later we only load a PNG with the same key and nothing else changes.
 // A texture that was already loaded from a file is never replaced.
+// EARLY: what the title screen and the loading bar need. Made in the Boot scene.
 export function createPlaceholderTextures(scene) {
   createFxTextures(scene);
   createDodoTextures(scene);
   createGameTextures(scene);
   createMithuTextures(scene);
+}
+
+// LATE: the art of the levels (villagers, Jadugar, monsters, buildings, boss). Making it takes a moment,
+// so the title screen shows first and this is done just after (and always before a level opens).
+let lateDone = false;
+export function ensureLateTextures(scene) {
+  if (lateDone) return;
+  lateDone = true;
   createNpcTextures(scene);
   createJadugarTextures(scene);
   createTrojanTextures(scene);

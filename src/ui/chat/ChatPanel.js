@@ -2,6 +2,7 @@ import './chat.css';
 import { askMithu, isOllamaUp, warmUp } from '../../ai/chatEngine.js';
 import { MAX_MESSAGES } from '../../data/chatConfig.js';
 import { t } from '../../i18n/index.js';
+import { audio } from '../../audio/AudioManager.js';
 
 const CHIPS = ['chat.chip1', 'chat.chip2', 'chat.chip3', 'chat.chip4'];
 
@@ -111,6 +112,7 @@ export default class ChatPanel {
   open({ getSnapshot, onClose } = {}) {
     if (this.isOpen) return;
     this.isOpen = true;
+    audio.duck(true); // the music is 40% quieter while the chat is open
     this.getSnapshot = getSnapshot || (() => null);
     this.onClose = onClose;
     this.root.querySelector('.mc-avatar').src = this.makeAvatar();
@@ -125,6 +127,7 @@ export default class ChatPanel {
   close() {
     if (!this.isOpen) return;
     this.isOpen = false;
+    audio.duck(false);
     if (this.abort) this.abort.abort();
     this.root.classList.remove('open');
     if (this.onClose) this.onClose();

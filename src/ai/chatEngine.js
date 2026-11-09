@@ -1,4 +1,6 @@
 import { findChunks, chunksToText } from './knowledgeSearch.js';
+import { findTerms, isListQuestion, termChunk } from './termRouter.js';
+import { GLOSSARY_LIST } from '../data/knowledge/glossary.js';
 import { OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CHECK_MS, OLLAMA_FIRST_TOKEN_MS, HISTORY_FOR_MODEL, OLLAMA_TEMPERATURE, OLLAMA_NUM_CTX } from '../data/chatConfig.js';
 import { contextToText } from './chatContext.js';
 import { answerFromFaq } from './faqBot.js';
@@ -11,7 +13,7 @@ import { answerFromFaq } from './faqBot.js';
 // Kept short on purpose: a small model stays focused when the prompt is short.
 const PERSONA = `You are Mithu, a friendly green parrot guide in the game Sindhu Defenders.
 - Answer only about this project (game, story, levels, monsters, AI, tools) and cyber safety. For anything else, politely bring the talk back to the project.
-- Simple English for a 12-year-old. At most 6 short sentences.
+- Simple English for a 12-year-old. At most 6 short sentences. If the KNOWLEDGE starts with a Glossary chunk for a term in the question, begin with that definition, then the game example and the defence.
 - Give real details (names, numbers, reasons) from the KNOWLEDGE below. Never invent facts. If it is not there, say you are not sure.
 - When useful, end with one short follow-up suggestion like "Want to know how the AI learns?".`;
 const MAX_SENTENCES = 6;
@@ -67,7 +69,11 @@ function shorten(text) {
 // Streams the answer from Ollama. onText(fullTextSoFar) is called while words arrive.
 async function askOllama(history, snapshot, onText, signal) {
   // RAG: only the best chunks for THIS question go to the model, plus the live game data
-  const found = findChunks(retrievalQuery(history), CHUNKS_FOR_MODEL);
+  // a cyber-security term in the question: its chunk always comes FIRST (the keyword router), then the best TF-IDF chunks
+  const query = retrievalQuery(history);
+  const forced = findTerms(query).slice(0, 2).map(termChunk);
+  const found = [...forced];
+  findChunks(query, CHUNKS_FOR_MODEL).forEach((c) => found.length < CHUNKS_FOR_MODEL && !found.some((f) => f.item.title === c.item.title) && found.push(c));
   const messages = [
     { role: 'system', content: `${PERSONA}\n\nKNOWLEDGE:\n${chunksToText(found)}\n\n${contextToText(snapshot)}` },
     ...history.slice(-HISTORY_FOR_MODEL).map((m) => ({ role: m.role, content: m.text.slice(0, 600) })),
@@ -127,6 +133,9 @@ async function askOllama(history, snapshot, onText, signal) {
 // Returns { source: 'ollama' | 'faq', text, matched }.
 export async function askMithu({ history, snapshot, onText, signal }) {
   const question = history[history.length - 1].text;
+
+  // "which terms are in the game?" is always the same list (no model needed)
+  if (isListQuestion(question)) return { source: 'faq', text: GLOSSARY_LIST.text, matched: true };
 
   if (await isOllamaUp()) {
     try {
